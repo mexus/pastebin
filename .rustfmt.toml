@@ -1,0 +1,6 @@
+indent_style = "Visual"
+wrap_comments = true
+comment_width = 100
+reorder_imports = true
+reorder_imports_in_group = true
+unstable_features = true
