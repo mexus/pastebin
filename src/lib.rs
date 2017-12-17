@@ -17,21 +17,16 @@ pub mod mongo_impl;
 pub mod web;
 
 pub use mongo_driver::MongoError;
+pub use mongo_driver::client::Uri;
 pub type RocketError = rocket::error::LaunchError;
 
 /// Database options.
 #[derive(Debug, Clone)]
 pub struct DbOptions {
-    /// Database host.
-    pub host: String,
-    /// Database port.
-    pub port: u16,
+    /// Database URI.
+    pub uri: Uri,
     /// Database name.
     pub db_name: String,
-    /// Database user.
-    pub db_user: Option<String>,
-    /// Database user's password.
-    pub db_pass: Option<String>,
     /// Collection name in the database.
     pub collection_name: String,
 }

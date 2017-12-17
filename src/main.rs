@@ -1,9 +1,9 @@
-extern crate env_logger;
 #[macro_use]
 extern crate log;
 extern crate pastebin;
 #[macro_use]
 extern crate quick_error;
+extern crate simplelog;
 
 use pastebin::{web, DbOptions, MongoError, RocketError};
 use pastebin::mongo_impl::MongoDbWrapper;
@@ -25,25 +25,29 @@ quick_error! {
             cause(err)
             from()
         }
-        Logger(err: log::SetLoggerError) {
+        Logger(err: simplelog::TermLogError) {
             cause(err)
             from()
         }
     }
 }
 
-fn init_logs() -> Result<(), Error> {
-    let mut builder = env_logger::LogBuilder::new();
-    builder.filter(None, log::LogLevelFilter::Info)
-           .filter(Some("pastebin::mongo_impl"), log::LogLevelFilter::Trace)
-           .init()?;
+fn init_logs(verbose: usize) -> Result<(), Error> {
+    simplelog::TermLogger::init(match verbose {
+                                    1 => log::LogLevelFilter::Warn,
+                                    2 => log::LogLevelFilter::Info,
+                                    3 => log::LogLevelFilter::Debug,
+                                    4 => log::LogLevelFilter::Trace,
+                                    _ => log::LogLevelFilter::Error,
+                                },
+                                Default::default())?;
     Ok(())
 }
 
 fn run() -> Result<(), Error> {
-    init_logs()?;
-    let config = cmdargs::parse()?;
-    let db_wrapper = MongoDbWrapper::new(config);
+    let options = cmdargs::parse()?;
+    init_logs(options.verbose)?;
+    let db_wrapper = MongoDbWrapper::new(options.db_options);
     let error = web::run_web(Box::new(db_wrapper));
     Err(error.into())
 }
