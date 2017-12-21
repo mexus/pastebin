@@ -10,12 +10,12 @@ extern crate log;
 extern crate mongo_driver;
 #[macro_use]
 extern crate quick_error;
-extern crate rand;
 extern crate rocket;
 
 pub mod mongo_impl;
 pub mod web;
 
+pub use bson::oid::ObjectId;
 pub use mongo_driver::MongoError;
 pub use mongo_driver::client::Uri;
 pub type RocketError = rocket::error::LaunchError;
@@ -39,16 +39,15 @@ pub trait MongoDbConnector: Sync + Send + 'static {
 /// Interface to a MongoDB database.
 pub trait MongoDbInterface {
     /// Stores the data into the database.
-    /// \return A unique identifier of a stored data.
-    fn store_data(&self, data: &[u8]) -> Result<[u8; 4], MongoError>;
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), MongoError>;
 
     /// Loads data from the database.
     /// \return A corresponding data if found, `None` otherwise.
-    fn load_data(&self, id: &[u8]) -> Result<Option<Vec<u8>>, MongoError>;
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, MongoError>;
 
     /// Removes data from the database.
     /// \return `None` if a corresponding data is not found, `Ok(())` otherwise.
-    fn remove_data(&self, id: &[u8]) -> Result<(), MongoError>;
+    fn remove_data(&self, id: ObjectId) -> Result<(), MongoError>;
 
     /// Tells the maximum data size that could be handled.
     fn max_data_size(&self) -> usize;

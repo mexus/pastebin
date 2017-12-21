@@ -1,4 +1,6 @@
 use MongoDbConnector;
+use ObjectId;
+use bson;
 use data_encoding::{self, BASE64URL_NOPAD};
 use mongo_driver;
 use rocket;
@@ -23,6 +25,14 @@ quick_error!{
         }
         TooBig {
             description("Too large paste")
+        }
+        BsonObjId(err: bson::oid::Error) {
+            from()
+            cause(err)
+        }
+        BsonIdWrongLength(len: usize) {
+            description("Wrong ID length")
+            display("Expected an ID to have length of 12, but it is {}", len)
         }
     }
 }
@@ -51,8 +61,21 @@ fn push(msg: rocket::Data,
         -> Result<String, Error> {
     let db = db_wrapper.connect();
     let data = load_data(msg, db.max_data_size())?;
-    let id = db.store_data(&data)?;
-    Ok(BASE64URL_NOPAD.encode(&id))
+    let id = ObjectId::new()?;
+    db.store_data(id.clone(), &data)?;
+    Ok(BASE64URL_NOPAD.encode(&id.bytes()))
+}
+
+fn id_from_string(src: String) -> Result<ObjectId, Error> {
+    let dyn_bytes = BASE64URL_NOPAD.decode(src.as_bytes())?;
+    if dyn_bytes.len() != 12 {
+        return Err(Error::BsonIdWrongLength(src.len()));
+    }
+    let mut bytes = [0u8; 12];
+    for i in 0..12usize {
+        bytes[i] = dyn_bytes[i];
+    }
+    Ok(ObjectId::with_bytes(bytes))
 }
 
 #[get("/<id>")]
@@ -60,15 +83,15 @@ fn get(id: String,
        db_wrapper: rocket::State<Box<MongoDbConnector>>)
        -> Result<Option<Vec<u8>>, Error> {
     let db = db_wrapper.connect();
-    let id = BASE64URL_NOPAD.decode(id.as_bytes())?;
-    Ok(db.load_data(&id)?)
+    let id = id_from_string(id)?;
+    Ok(db.load_data(id)?)
 }
 
 #[delete("/<id>")]
 fn remove(id: String, db_wrapper: rocket::State<Box<MongoDbConnector>>) -> Result<(), Error> {
     let db = db_wrapper.connect();
-    let id = BASE64URL_NOPAD.decode(id.as_bytes())?;
-    db.remove_data(&id)?;
+    let id = id_from_string(id)?;
+    db.remove_data(id)?;
     Ok(())
 }
 

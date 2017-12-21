@@ -1,14 +1,12 @@
 use DbOptions;
 use MongoDbConnector;
 use MongoDbInterface;
+use ObjectId;
 use bson::{self, Bson};
 use mongo_driver::MongoError;
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
 use std::sync::Arc;
-
-use rand;
-use rand::Rng;
 
 /// A MongoDB wrapper that produces `MongoDbConnectionWrapper`s.
 pub struct MongoDbConnectionWrapper {
@@ -57,38 +55,6 @@ impl MongoDbConnectionWrapper {
     }
 }
 
-/// Generates a random ID and finds out whether it is unique or not.
-fn try_to_store_unique_id(collection: &Collection,
-                          bson_data: Bson)
-                          -> Result<Option<[u8; 4]>, MongoError> {
-    let id = {
-        let mut id = [0u8; 4];
-        rand::thread_rng().fill_bytes(&mut id);
-        id
-    };
-    let bson_id = binary_to_bson(&id);
-    let filter = doc! {"id": bson_id.clone()};
-    let new_doc = doc! { "$setOnInsert" => { "id": bson_id, "data": bson_data.clone() } };
-    debug!("Trying ID {:?}", id);
-    let result_doc: bson::Document =
-        collection.find_and_modify(&filter, FindAndModifyOperation::Upsert(&new_doc), None)?;
-    let val: &Bson = match result_doc.get("value") {
-        None => {
-            error!("Can't find a 'value' field in a server's response: {:?}",
-                   result_doc);
-            return Ok(None);
-        }
-        Some(x) => x,
-    };
-    Ok(match val {
-        &Bson::Null => Some(id),
-        _ => {
-            info!("ID {:?} is already in use", id);
-            None
-        }
-    })
-}
-
 fn binary_to_bson(data: &[u8]) -> Bson {
     Bson::Binary(bson::spec::BinarySubtype::Generic, data.to_vec())
 }
@@ -106,21 +72,17 @@ fn binary_from_bson(data: Bson) -> Result<Vec<u8>, bson::DecoderError> {
 }
 
 impl MongoDbInterface for MongoDbConnectionWrapper {
-    fn store_data(&self, data: &[u8]) -> Result<[u8; 4], MongoError> {
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), MongoError> {
         let bson_data = binary_to_bson(data);
         let collection = self.get_collection();
-        loop {
-            if let Some(id) = try_to_store_unique_id(&collection, bson_data.clone())? {
-                debug!("Inserted data to id = {:?}", id);
-                return Ok(id);
-            }
-        }
+        let new_doc = doc!("_id": id, "data": bson_data);
+        collection.insert(&new_doc, None)?;
+        Ok(())
     }
 
-    fn load_data(&self, id: &[u8]) -> Result<Option<Vec<u8>>, MongoError> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, MongoError> {
         debug!("Looking for a doc id = {:?}", id);
-        let bson_id = binary_to_bson(id);
-        let filter = doc!{"id": bson_id};
+        let filter = doc!("_id": id);
         let collection = self.get_collection();
         let doc = collection.find(&filter, None)?
                             .nth(0)
@@ -132,11 +94,10 @@ impl MongoDbInterface for MongoDbConnectionWrapper {
         })
     }
 
-    fn remove_data(&self, id: &[u8]) -> Result<(), MongoError> {
+    fn remove_data(&self, id: ObjectId) -> Result<(), MongoError> {
         debug!("Looking for a doc id = {:?}", id);
-        let bson_id = binary_to_bson(id);
         let collection = self.get_collection();
-        collection.find_and_modify(&doc!{"id": bson_id}, FindAndModifyOperation::Remove, None)?;
+        collection.find_and_modify(&doc!("id": id), FindAndModifyOperation::Remove, None)?;
         Ok(())
     }
 
