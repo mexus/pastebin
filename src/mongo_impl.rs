@@ -84,14 +84,16 @@ impl MongoDbInterface for MongoDbConnectionWrapper {
         debug!("Looking for a doc id = {:?}", id);
         let filter = doc!("_id": id);
         let collection = self.get_collection();
-        let doc = collection.find(&filter, None)?
-                            .nth(0)
-                            .and_then(|doc| doc.ok())
-                            .and_then(|doc| doc.get("data").cloned());
-        Ok(match doc {
-            None => None,
-            Some(data) => Some(binary_from_bson(data)?),
-        })
+        let data = collection.find(&filter, None)?
+                             .nth(0)
+                             .and_then(|doc| doc.ok())
+                             .and_then(|doc| doc.get("data").cloned())
+                             .map(|data| binary_from_bson(data));
+        match data {
+            None => Ok(None),
+            Some(Ok(data)) => Ok(Some(data)),
+            Some(Err(e)) => Err(e.into()),
+        }
     }
 
     fn remove_data(&self, id: ObjectId) -> Result<(), MongoError> {
