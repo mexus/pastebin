@@ -6,6 +6,12 @@ extern crate quick_error;
 
 pub mod web;
 
+#[cfg(test)]
+mod test;
+
+#[cfg(test)]
+extern crate reqwest;
+
 use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use std::error;
