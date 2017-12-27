@@ -40,6 +40,7 @@ quick_error! {
 }
 
 fn init_logs(verbose: usize) -> Result<(), Error> {
+    // Set up the logging depending on how many times a '-v' option has been used.
     simplelog::TermLogger::init(match verbose {
                                     1 => log::LogLevelFilter::Warn,
                                     2 => log::LogLevelFilter::Info,
@@ -59,7 +60,7 @@ fn run() -> Result<(), Error> {
                                          options.db_options.collection_name,
                                          mongo_client_pool);
     let mut _web = pastebin::web::run_web(db_wrapper, options.web_addr)?;
-    Ok(())
+    unreachable!()
 }
 
 fn main() {

@@ -1,3 +1,14 @@
+//! A *Pastebin* server library.
+//!
+//! This library implements a very simple *pastebin* service, which is basically a web-interface
+//! between a user and a database (be it MongoDB, or hash table, or MariaDB, or anything else).
+//! The library is database-agnostic, which means a database wrapper has to be implemented for a
+//! desired DB kind my implementing a quite simple interface `DbInterface`.
+//!
+//! [Iron](https://github.com/iron/iron) is used as a web-backend, so all its features could be
+//! utilized (at least theoretically). The actual code is in the [web](web/index.html) module,
+//! useful examples are also there.
+
 extern crate bson;
 extern crate data_encoding;
 extern crate iron;
@@ -16,32 +27,59 @@ use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use std::error;
 
-/// A helper type to store an arbitrary error.
+/// A helper type that implements the `std::error::Error` trait to store an arbitrary error.
 ///
-/// Use DbError::new() to create a new instance.
+/// Use `DbError::new()` to create a new instance.
+///
+/// # Example
+///
+/// ```
+/// use pastebin::DbError;
+/// use std::fs::File;
+///
+/// fn foo() -> Result<File, DbError> {
+///   let f = File::create("/tmp/test").map_err(DbError::new)?;
+///   Ok(f)
+/// }
+/// ```
 #[derive(Debug)]
 pub struct DbError(Box<error::Error + Send + Sync>);
 
 impl DbError {
-    /// A helper method that creates a new instance of DbError using an arbitrary error.
+    /// A helper method that creates a new instance of `DbError` from an arbitrary error.
     pub fn new<E: error::Error + Send + Sync + 'static>(e: E) -> Self {
         DbError(Box::new(e))
     }
 }
 
 /// Interface to a database.
+///
+/// To store and retrieve pastes from a database we only need several functions. And we can
+/// describe them to be abstract enough to be easily used with just any kind of database, be it
+/// SQL, NoSQL or just a hash table or whatever.
 pub trait DbInterface: Send + Sync {
-    /// Stores the data into the database.
+    /// Stores the data into the database under a given ID.
+    ///
+    /// Unique ID has to be generated before calling this method. It might be found to be an extra
+    /// burden since usually a database will generate an ID for you, but generating it in advance
+    /// actually makes you not to rely on a database to return the generated ID. As of MongoDB, the
+    /// identifier is generated on the client side anyhow.
     fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError>;
 
     /// Loads data from the database.
+    ///
     /// Returns a corresponding data if found, `None` otherwise.
     fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError>;
 
     /// Removes data from the database.
-    /// Returns `None` if a corresponding data is not found, `Ok(())` otherwise.
+    ///
+    /// Normally we don't care whether an object exists in the database or not, so an
+    /// implementation doesn't have to check that fact, and usually databases are okay with
+    /// attempts to remove something that doesn't exist.
     fn remove_data(&self, id: ObjectId) -> Result<(), DbError>;
 
     /// Tells the maximum data size that could be handled.
+    ///
+    /// This is useful, for example, for MongoDB which has a limit on a BSON document size.
     fn max_data_size(&self) -> usize;
 }
