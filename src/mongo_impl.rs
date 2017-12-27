@@ -99,7 +99,7 @@ impl MongoDbInterface for MongoDbConnectionWrapper {
     fn remove_data(&self, id: ObjectId) -> Result<(), MongoError> {
         debug!("Looking for a doc id = {:?}", id);
         let collection = self.get_collection();
-        collection.find_and_modify(&doc!("id": id), FindAndModifyOperation::Remove, None)?;
+        collection.find_and_modify(&doc!("_id": id), FindAndModifyOperation::Remove, None)?;
         Ok(())
     }
 

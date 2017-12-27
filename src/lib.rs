@@ -1,24 +1,20 @@
-#![feature(plugin)]
-#![feature(custom_derive)]
-#![plugin(rocket_codegen)]
-
 #[macro_use]
 extern crate bson;
 extern crate data_encoding;
+extern crate iron;
 #[macro_use]
 extern crate log;
 extern crate mongo_driver;
 #[macro_use]
 extern crate quick_error;
-extern crate rocket;
 
 pub mod mongo_impl;
 pub mod web;
 
 pub use bson::oid::ObjectId;
+pub use iron::error::{HttpError, HttpResult};
 pub use mongo_driver::MongoError;
 pub use mongo_driver::client::Uri;
-pub type RocketError = rocket::error::LaunchError;
 
 /// Database options.
 #[derive(Debug, Clone)]

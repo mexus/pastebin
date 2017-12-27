@@ -5,7 +5,7 @@ extern crate pastebin;
 extern crate quick_error;
 extern crate simplelog;
 
-use pastebin::{web, DbOptions, MongoError, RocketError};
+use pastebin::{web, DbOptions, HttpError, MongoError};
 use pastebin::mongo_impl::MongoDbWrapper;
 
 mod cmdargs;
@@ -21,11 +21,11 @@ quick_error! {
             cause(err)
             from()
         }
-        Rocket(err: RocketError) {
+        Logger(err: simplelog::TermLogError) {
             cause(err)
             from()
         }
-        Logger(err: simplelog::TermLogError) {
+        HttpError(err: HttpError) {
             cause(err)
             from()
         }
@@ -48,8 +48,8 @@ fn run() -> Result<(), Error> {
     let options = cmdargs::parse()?;
     init_logs(options.verbose)?;
     let db_wrapper = MongoDbWrapper::new(options.db_options);
-    let error = web::run_web(Box::new(db_wrapper));
-    Err(error.into())
+    let mut _web = web::run_web(Box::new(db_wrapper))?;
+    Ok(())
 }
 
 fn main() {
