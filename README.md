@@ -9,9 +9,9 @@ stuff.
 
 ## Performance
 
-I've run a simple performance test on my maching and the service is okay with
-doing about 500 10 KB requests per second (in 5 threads). But we need better
-performance tests.
+I've run a simple performance test on my maching and the service is able to
+accept about 6500 post requests per second for 10 KB samples and about 3000
+posts requests per seconds for 100 KB samples.
 
 ## Limitations
 
