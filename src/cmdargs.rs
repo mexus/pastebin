@@ -43,6 +43,8 @@ pub struct DbOptions {
 pub struct Options {
     /// Database options.
     pub db_options: DbOptions,
+    /// Web server address (in the form of `ip:port`).
+    pub web_addr: String,
     /// Verbosity level.
     pub verbose: usize,
 }
@@ -68,36 +70,46 @@ pub fn parse() -> Result<Options, Error> {
     let collection_name = args.value_of("COLLECTION_NAME").ok_or(no_arg("COLLECTION_NAME"))?
                               .to_string();
     let verbose = args.occurrences_of("VERBOSE") as usize;
+    let web_addr = args.value_of("WEB_ADDR").ok_or(no_arg("WEB_ADDR"))?
+                       .to_string();
 
     Ok(Options { db_options: DbOptions { uri,
                                          db_name,
                                          collection_name, },
+                 web_addr,
                  verbose, })
 }
 
 /// Builds command line arguments.
 fn build_cli() -> clap::App<'static, 'static> {
     use self::clap::{App, Arg};
-    App::new("Pastebin web server").about("Launches a pastebin web server.")
-                                   .arg(Arg::with_name("DB_URI").long("db-uri")
-                                                                 .value_name("URI")
-                                                                 .takes_value(true)
-                                                                 .required(true)
-                                                                 .help("Database URI (mongodb://...)"))
-                                   .arg(Arg::with_name("DB_NAME").long("db-name")
-                                                                 .value_name("name")
-                                                                 .takes_value(true)
-                                                                 .required(true)
-                                                                 .help("Name of the database"))
-                                   .arg(Arg::with_name("COLLECTION_NAME").long("collection")
-                                                                         .value_name("name")
-                                                                         .takes_value(true)
-                                                                         .required(true)
-                                                                         .help("Collection name"))
-                                   .arg(Arg::with_name("VERBOSE").long("verbose")
-                                                                 .short("v")
-                                                                 .takes_value(false)
-                                                                 .required(false)
-                                                                 .multiple(true)
-                                                                 .help("Verbosity level"))
+    App::new("Pastebin web server")
+        .about("Launches a pastebin web server.")
+        .arg(Arg::with_name("DB_URI").long("db-uri")
+                                      .value_name("URI")
+                                      .takes_value(true)
+                                      .required(true)
+                                      .help("Database URI (mongodb://...)"))
+        .arg(Arg::with_name("DB_NAME").long("db-name")
+                                      .value_name("name")
+                                      .takes_value(true)
+                                      .required(true)
+                                      .help("Name of the database"))
+        .arg(Arg::with_name("COLLECTION_NAME").long("collection")
+                                              .value_name("name")
+                                              .takes_value(true)
+                                              .required(true)
+                                              .help("Collection name"))
+        .arg(Arg::with_name("VERBOSE").long("verbose")
+                                      .short("v")
+                                      .takes_value(false)
+                                      .required(false)
+                                      .multiple(true)
+                                      .help("Verbosity level"))
+        .arg(Arg::with_name("WEB_ADDR").long("web-addr")
+                                      .value_name("address")
+                                      .takes_value(true)
+                                      .required(true)
+                                      .default_value("localhost:8000")
+                                      .help("Web server address"))
 }

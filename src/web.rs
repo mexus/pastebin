@@ -13,6 +13,7 @@ use iron::prelude::*;
 use iron::status;
 use std::convert::From;
 use std::io::{self, Read};
+use std::net::ToSocketAddrs;
 use std::ops::Deref;
 
 quick_error!{
@@ -165,9 +166,12 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 
 /// Runs a web server.
 ///
-/// Basically this is the main function of the library. Starts a web server on
-/// `http://localhost:8000` and serves the following HTTP requests: `GET`, `POST` and `DELETE`.
-pub fn run_web<Db: DbInterface + 'static>(db_wrapper: Db) -> HttpResult<iron::Listening> {
+/// Basically this is the main function of the library. Starts a web server and serves the
+/// following HTTP requests: `GET`, `POST` and `DELETE`.
+pub fn run_web<Db, A>(db_wrapper: Db, addr: A) -> HttpResult<iron::Listening>
+    where Db: DbInterface + 'static,
+          A: ToSocketAddrs
+{
     let pastebin = Pastebin::new(Box::new(db_wrapper));
-    Iron::new(pastebin).http("localhost:8000")
+    Iron::new(pastebin).http(addr)
 }
