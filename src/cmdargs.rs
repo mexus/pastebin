@@ -1,7 +1,7 @@
 extern crate clap;
 
 use DbOptions;
-use pastebin::Uri;
+use mongo_driver::client::Uri;
 use std::num;
 
 quick_error! {

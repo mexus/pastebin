@@ -1,11 +1,16 @@
+extern crate iron;
 #[macro_use]
 extern crate log;
+extern crate mongo_driver;
 extern crate pastebin;
 #[macro_use]
 extern crate quick_error;
 extern crate simplelog;
 
-use pastebin::{web, DbOptions, HttpError, MongoError};
+use iron::error::HttpError;
+use mongo_driver::MongoError;
+
+use pastebin::DbOptions;
 use pastebin::mongo_impl::MongoDbWrapper;
 
 mod cmdargs;
@@ -48,7 +53,7 @@ fn run() -> Result<(), Error> {
     let options = cmdargs::parse()?;
     init_logs(options.verbose)?;
     let db_wrapper = MongoDbWrapper::new(options.db_options);
-    let mut _web = web::run_web(Box::new(db_wrapper))?;
+    let mut _web = pastebin::web::run_web(Box::new(db_wrapper))?;
     Ok(())
 }
 

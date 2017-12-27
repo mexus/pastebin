@@ -1,3 +1,5 @@
+//! MongoDB wrapper that implements `MongoDbConnector` and `MongoDbInterface`.
+
 use DbOptions;
 use MongoDbConnector;
 use MongoDbInterface;
