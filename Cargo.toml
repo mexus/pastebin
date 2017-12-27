@@ -1,12 +1,13 @@
 [package]
 name = "pastebin"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["mexus <gilaldpellaeon@gmail.com>"]
 description = "A simple pastebin service"
 license = "GPL-3.0"
 readme = "README.md"
 keywords = ["pastebin"]
 repository = "https://github.com/mexus/pastebin"
+documentation = "https://docs.rs/pastebin/"
 
 [badges]
 maintenance = { status = "experimental" }

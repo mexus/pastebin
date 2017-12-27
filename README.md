@@ -1,11 +1,13 @@
+[Docs](https://docs.rs/pastebin)
+
 # Simple pastebin server
 
 ## About
 
 A simple multipurpose RESTful storage server written in
 [Rust](https://www.rust-lang.org/). It uses [MongoDB](https://www.mongodb.com/)
-as a storage backend and [Rocket](https://rocket.rs) web framework to do the web
-stuff.
+as a storage backend and [Iron](https://github.com/iron/iron) web framework to
+do the web stuff.
 
 ## Performance
 
