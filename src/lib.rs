@@ -1,51 +1,40 @@
-#[macro_use]
 extern crate bson;
 extern crate data_encoding;
 extern crate iron;
 #[macro_use]
-extern crate log;
-extern crate mongo_driver;
-#[macro_use]
 extern crate quick_error;
 
-pub mod mongo_impl;
 pub mod web;
 
 use bson::oid::ObjectId;
 use iron::error::HttpResult;
-use mongo_driver::MongoError;
+use std::error;
 
-type MongoUri = mongo_driver::client::Uri;
+/// A helper type to store an arbitrary error.
+///
+/// Use DbError::new() to create a new instance.
+#[derive(Debug)]
+pub struct DbError(Box<error::Error + Send + Sync>);
 
-/// Database options.
-#[derive(Debug, Clone)]
-pub struct DbOptions {
-    /// Database URI.
-    pub uri: MongoUri,
-    /// Database name.
-    pub db_name: String,
-    /// Collection name in the database.
-    pub collection_name: String,
+impl DbError {
+    /// A helper method that creates a new instance of DbError using an arbitrary error.
+    pub fn new<E: error::Error + Send + Sync + 'static>(e: E) -> Self {
+        DbError(Box::new(e))
+    }
 }
 
-/// Interface for a connection pool.
-pub trait MongoDbConnector: Sync + Send + 'static {
-    /// Establish a connection to a database.
-    fn connect(&self) -> Box<MongoDbInterface>;
-}
-
-/// Interface to a MongoDB database.
-pub trait MongoDbInterface {
+/// Interface to a database.
+pub trait DbInterface: Send + Sync {
     /// Stores the data into the database.
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), MongoError>;
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError>;
 
     /// Loads data from the database.
     /// Returns a corresponding data if found, `None` otherwise.
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, MongoError>;
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError>;
 
     /// Removes data from the database.
     /// Returns `None` if a corresponding data is not found, `Ok(())` otherwise.
-    fn remove_data(&self, id: ObjectId) -> Result<(), MongoError>;
+    fn remove_data(&self, id: ObjectId) -> Result<(), DbError>;
 
     /// Tells the maximum data size that could be handled.
     fn max_data_size(&self) -> usize;

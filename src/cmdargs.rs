@@ -1,6 +1,5 @@
 extern crate clap;
 
-use DbOptions;
 use mongo_driver;
 use std::num;
 
@@ -26,6 +25,17 @@ quick_error! {
             from()
         }
     }
+}
+
+/// Database options.
+#[derive(Debug, Clone)]
+pub struct DbOptions {
+    /// Database URI.
+    pub uri: MongoUri,
+    /// Database name.
+    pub db_name: String,
+    /// Collection name in the database.
+    pub collection_name: String,
 }
 
 #[derive(Debug)]

@@ -1,7 +1,8 @@
 //! Module that deals with a web server. See `run_web()` documentation for details.
 
+use DbError;
+use DbInterface;
 use HttpResult;
-use MongoDbConnector;
 use ObjectId;
 use bson;
 use data_encoding::{self, BASE64URL_NOPAD};
@@ -10,9 +11,9 @@ use iron::Handler;
 use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
-use mongo_driver;
 use std::convert::From;
 use std::io::{self, Read};
+use std::ops::Deref;
 
 quick_error!{
     /// Errors descriptions.
@@ -20,11 +21,6 @@ quick_error!{
     pub enum Error {
         /// Input/output error.
         Io(err: io::Error) {
-            from()
-            cause(err)
-        }
-        /// MongoDB error.
-        Mongo(err: mongo_driver::MongoError) {
             from()
             cause(err)
         }
@@ -56,6 +52,11 @@ quick_error!{
             description("ID not found")
             display("Id {} not found", id)
         }
+        /// Database error.
+        DbError(err: DbError) {
+            from()
+            cause(err.0.deref())
+        }
     }
 }
 
@@ -70,7 +71,7 @@ impl From<Error> for IronError {
 
 /// An intermediate structure that handles information about a MongoDB connection.
 struct Pastebin {
-    db: Box<MongoDbConnector>,
+    db: Box<DbInterface>,
 }
 
 /// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`) and tries to convert it
@@ -98,15 +99,14 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
 
 impl Pastebin {
     /// Initializes a pastebin web server with a database interface.
-    fn new(db: Box<MongoDbConnector>) -> Pastebin {
+    fn new(db: Box<DbInterface>) -> Pastebin {
         Pastebin { db }
     }
 
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let data = self.db.connect()
-                       .load_data(id.clone())
+        let data = self.db.load_data(id.clone())
                        .map_err(Into::<Error>::into)?
                        .ok_or(Error::IdNotFound(id))?;
         Ok(Response::with((status::Ok, data)))
@@ -114,24 +114,21 @@ impl Pastebin {
 
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
-        let connection = self.db.connect();
-        let data = match load_data(&mut req.body, connection.max_data_size()) {
+        let data = match load_data(&mut req.body, self.db.max_data_size()) {
             Ok(data) => data,
             Err(Error::TooBig) => return Ok(Response::with(status::PayloadTooLarge)),
             Err(e) => panic!{"Error {:?}", e},
         };
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        connection.store_data(id.clone(), &data)
-                  .map_err(Into::<Error>::into)?;
+        self.db.store_data(id.clone(), &data)
+            .map_err(Into::<Error>::into)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
     }
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        self.db.connect()
-            .remove_data(id)
-            .map_err(Into::<Error>::into)?;
+        self.db.remove_data(id).map_err(Into::<Error>::into)?;
         Ok(Response::with(status::Ok))
     }
 }
@@ -170,7 +167,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///
 /// Basically this is the main function of the library. Starts a web server on
 /// `http://localhost:8000` and serves the following HTTP requests: `GET`, `POST` and `DELETE`.
-pub fn run_web(db_wrapper: Box<MongoDbConnector>) -> HttpResult<iron::Listening> {
-    let pastebin = Pastebin::new(db_wrapper);
+pub fn run_web<Db: DbInterface + 'static>(db_wrapper: Db) -> HttpResult<iron::Listening> {
+    let pastebin = Pastebin::new(Box::new(db_wrapper));
     Iron::new(pastebin).http("localhost:8000")
 }

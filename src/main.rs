@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate bson;
 extern crate iron;
 #[macro_use]
 extern crate log;
@@ -7,13 +9,13 @@ extern crate pastebin;
 extern crate quick_error;
 extern crate simplelog;
 
+mod cmdargs;
+mod mongo_impl;
+
 use iron::error::HttpError;
 use mongo_driver::MongoError;
-
-use pastebin::DbOptions;
-use pastebin::mongo_impl::MongoDbWrapper;
-
-mod cmdargs;
+use mongo_driver::client::ClientPool;
+use mongo_impl::MongoDbWrapper;
 
 quick_error! {
     #[derive(Debug)]
@@ -52,8 +54,11 @@ fn init_logs(verbose: usize) -> Result<(), Error> {
 fn run() -> Result<(), Error> {
     let options = cmdargs::parse()?;
     init_logs(options.verbose)?;
-    let db_wrapper = MongoDbWrapper::new(options.db_options);
-    let mut _web = pastebin::web::run_web(Box::new(db_wrapper))?;
+    let mongo_client_pool = ClientPool::new(options.db_options.uri.clone(), None);
+    let db_wrapper = MongoDbWrapper::new(options.db_options.db_name,
+                                         options.db_options.collection_name,
+                                         mongo_client_pool);
+    let mut _web = pastebin::web::run_web(db_wrapper)?;
     Ok(())
 }
 

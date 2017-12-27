@@ -1,54 +1,25 @@
-//! MongoDB wrapper that implements `MongoDbConnector` and `MongoDbInterface`.
+//! MongoDB wrapper that implements `DbInterface`.
 
-use DbOptions;
-use MongoDbConnector;
-use MongoDbInterface;
-use ObjectId;
 use bson::{self, Bson};
-use mongo_driver::MongoError;
+use bson::oid::ObjectId;
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
+use pastebin::{DbError, DbInterface};
 use std::sync::Arc;
 
-/// A MongoDB wrapper that produces `MongoDbConnectionWrapper`s.
-pub struct MongoDbConnectionWrapper {
+/// A MongoDB wrapper.
+pub struct MongoDbWrapper {
     db_name: String,
     collection_name: String,
     client_pool: Arc<ClientPool>,
 }
 
-/// A MongoDB client poll wrapper.
-/// This class initializes and holds a reference for a client pool, and it uses it to create
-/// `MongoDbConnectionWrapper` instances.
-#[derive(Debug)]
-pub struct MongoDbWrapper {
-    options: DbOptions,
-    client_pool: Arc<ClientPool>,
-}
-
 impl MongoDbWrapper {
-    /// Creates a new connections producer with a given options.
-    pub fn new(options: DbOptions) -> Self {
-        let client_pool = Arc::new(ClientPool::new(options.uri.clone(), None));
-        MongoDbWrapper { options,
-                         client_pool, }
-    }
-}
-
-impl MongoDbConnector for MongoDbWrapper {
-    fn connect(&self) -> Box<MongoDbInterface> {
-        Box::new(MongoDbConnectionWrapper::new(self.options.db_name.clone(),
-                                               self.options.collection_name.clone(),
-                                               self.client_pool.clone()))
-    }
-}
-
-impl MongoDbConnectionWrapper {
     /// Constructs a new mongodb wrapper.
-    fn new(db_name: String, collection_name: String, client_pool: Arc<ClientPool>) -> Self {
+    pub fn new(db_name: String, collection_name: String, client_pool: ClientPool) -> Self {
         Self { db_name,
                collection_name,
-               client_pool, }
+               client_pool: Arc::new(client_pool), }
     }
 
     fn get_collection(&self) -> Collection {
@@ -73,35 +44,36 @@ fn binary_from_bson(data: Bson) -> Result<Vec<u8>, bson::DecoderError> {
     }
 }
 
-impl MongoDbInterface for MongoDbConnectionWrapper {
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), MongoError> {
+impl DbInterface for MongoDbWrapper {
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError> {
         let bson_data = binary_to_bson(data);
         let collection = self.get_collection();
         let new_doc = doc!("_id": id, "data": bson_data);
-        collection.insert(&new_doc, None)?;
-        Ok(())
+        collection.insert(&new_doc, None).map_err(DbError::new)
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, MongoError> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError> {
         debug!("Looking for a doc id = {:?}", id);
         let filter = doc!("_id": id);
         let collection = self.get_collection();
-        let data = collection.find(&filter, None)?
+        let data = collection.find(&filter, None)
+                             .map_err(DbError::new)?
                              .nth(0)
                              .and_then(|doc| doc.ok())
                              .and_then(|doc| doc.get("data").cloned())
                              .map(|data| binary_from_bson(data));
-        match data {
-            None => Ok(None),
-            Some(Ok(data)) => Ok(Some(data)),
-            Some(Err(e)) => Err(e.into()),
+        if let Some(res) = data {
+            res.map(|data| Some(data)).map_err(DbError::new)
+        } else {
+            Ok(None)
         }
     }
 
-    fn remove_data(&self, id: ObjectId) -> Result<(), MongoError> {
+    fn remove_data(&self, id: ObjectId) -> Result<(), DbError> {
         debug!("Looking for a doc id = {:?}", id);
         let collection = self.get_collection();
-        collection.find_and_modify(&doc!("_id": id), FindAndModifyOperation::Remove, None)?;
+        collection.find_and_modify(&doc!("_id": id), FindAndModifyOperation::Remove, None)
+                  .map_err(DbError::new)?;
         Ok(())
     }
 
