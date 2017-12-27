@@ -1,8 +1,10 @@
 extern crate clap;
 
 use DbOptions;
-use mongo_driver::client::Uri;
+use mongo_driver;
 use std::num;
+
+type MongoUri = mongo_driver::client::Uri;
 
 quick_error! {
     /// Commandline parsing errors.
@@ -40,8 +42,8 @@ fn no_arg(arg: &str) -> Error {
     Error::NoArgument(arg.into())
 }
 
-fn parse_uri(arg: &str) -> Result<Uri, Error> {
-    match Uri::new(arg.to_string()) {
+fn parse_uri(arg: &str) -> Result<MongoUri, Error> {
+    match MongoUri::new(arg.to_string()) {
         Some(uri) => Ok(uri),
         None => Err(Error::ParseUri(arg.to_string())),
     }

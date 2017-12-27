@@ -14,13 +14,14 @@ pub mod web;
 use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use mongo_driver::MongoError;
-use mongo_driver::client::Uri;
+
+type MongoUri = mongo_driver::client::Uri;
 
 /// Database options.
 #[derive(Debug, Clone)]
 pub struct DbOptions {
     /// Database URI.
-    pub uri: Uri,
+    pub uri: MongoUri,
     /// Database name.
     pub db_name: String,
     /// Collection name in the database.
