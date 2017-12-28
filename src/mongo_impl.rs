@@ -2,9 +2,10 @@
 
 use bson::{self, Bson};
 use bson::oid::ObjectId;
+use mongo_driver::MongoError;
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
-use pastebin::{DbError, DbInterface};
+use pastebin::DbInterface;
 use std::sync::Arc;
 
 /// A MongoDB wrapper.
@@ -45,35 +46,35 @@ fn binary_from_bson(data: Bson) -> Result<Vec<u8>, bson::DecoderError> {
 }
 
 impl DbInterface for MongoDbWrapper {
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError> {
+    type Error = MongoError;
+
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
         let bson_data = binary_to_bson(data);
         let collection = self.get_collection();
         let new_doc = doc!("_id": id, "data": bson_data);
-        collection.insert(&new_doc, None).map_err(DbError::new)
+        collection.insert(&new_doc, None)
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
         debug!("Looking for a doc id = {:?}", id);
         let filter = doc!("_id": id);
         let collection = self.get_collection();
-        let data = collection.find(&filter, None)
-                             .map_err(DbError::new)?
+        let data = collection.find(&filter, None)?
                              .nth(0)
                              .and_then(|doc| doc.ok())
                              .and_then(|doc| doc.get("data").cloned())
                              .map(|data| binary_from_bson(data));
         if let Some(res) = data {
-            res.map(|data| Some(data)).map_err(DbError::new)
+            res.map(|data| Some(data)).map_err(Into::into)
         } else {
             Ok(None)
         }
     }
 
-    fn remove_data(&self, id: ObjectId) -> Result<(), DbError> {
+    fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
         debug!("Looking for a doc id = {:?}", id);
         let collection = self.get_collection();
-        collection.find_and_modify(&doc!("_id": id), FindAndModifyOperation::Remove, None)
-                  .map_err(DbError::new)?;
+        collection.find_and_modify(&doc!("_id": id), FindAndModifyOperation::Remove, None)?;
         Ok(())
     }
 

@@ -1,9 +1,10 @@
-use DbError;
 use DbInterface;
 use ObjectId;
 use data_encoding::BASE64URL_NOPAD;
 use reqwest::Client;
 use std::collections::HashMap;
+use std::error;
+use std::fmt;
 use std::sync::{Arc, Mutex};
 use web::run_web;
 
@@ -33,18 +34,34 @@ fn oid_to_str(id: ObjectId) -> String {
     BASE64URL_NOPAD.encode(&id.bytes())
 }
 
+#[derive(Debug)]
+struct FakeError;
+impl error::Error for FakeError {
+    fn description(&self) -> &str {
+        "nothing happened"
+    }
+}
+
+impl fmt::Display for FakeError {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+}
+
 impl DbInterface for FakeDb {
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError> {
+    type Error = FakeError;
+
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
         let mut storage = self.storage.lock().unwrap();
         storage.insert(oid_to_str(id), data.to_vec());
         Ok(())
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
         Ok(self.find_data(oid_to_str(id)))
     }
 
-    fn remove_data(&self, id: ObjectId) -> Result<(), DbError> {
+    fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
         self.storage.lock().unwrap().remove(&oid_to_str(id));
         Ok(())
     }

@@ -13,6 +13,7 @@ use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
 use std::convert::From;
+use std::error;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
 
@@ -56,18 +57,28 @@ quick_error!{
     }
 }
 
+struct DbError<E: Sync + Send + error::Error>(E);
+
+impl<E> From<DbError<E>> for IronError
+    where E: Sync + Send + error::Error + 'static
+{
+    fn from(err: DbError<E>) -> IronError {
+        IronError::new(err.0, status::BadRequest)
+    }
+}
+
 impl From<Error> for IronError {
     fn from(err: Error) -> IronError {
         match err {
-            e @ Error::IdNotFound(_) => IronError::new(e, status::BadRequest),
+            e @ Error::IdNotFound(_) => IronError::new(e, status::NotFound),
             e => IronError::new(e, status::BadRequest),
         }
     }
 }
 
 /// An intermediate structure that handles information about a MongoDB connection.
-struct Pastebin {
-    db: Box<DbInterface>,
+struct Pastebin<E> {
+    db: Box<DbInterface<Error = E>>,
 }
 
 /// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`) and tries to convert it
@@ -93,16 +104,20 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
     Ok(ObjectId::with_bytes(bytes))
 }
 
-impl Pastebin {
+impl<E> Pastebin<E>
+    where E: Send + Sync + error::Error + 'static
+{
     /// Initializes a pastebin web server with a database interface.
-    fn new(db: Box<DbInterface>) -> Pastebin {
+    fn new(db: Box<DbInterface<Error = E>>) -> Self {
         Pastebin { db }
     }
 
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let data = self.db.load_data(id.clone())?.ok_or(Error::IdNotFound(id))?;
+        let data = self.db.load_data(id.clone())
+                       .map_err(DbError)?
+                       .ok_or(Error::IdNotFound(id))?;
         Ok(Response::with((status::Ok, data)))
     }
 
@@ -114,19 +129,21 @@ impl Pastebin {
             Err(e) => panic!{"Error {:?}", e},
         };
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        self.db.store_data(id.clone(), &data)?;
+        self.db.store_data(id.clone(), &data).map_err(DbError)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
     }
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        self.db.remove_data(id)?;
+        self.db.remove_data(id).map_err(DbError)?;
         Ok(Response::with(status::Ok))
     }
 }
 
-impl Handler for Pastebin {
+impl<E> Handler for Pastebin<E>
+    where E: Send + Sync + error::Error + 'static
+{
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         match req.method {
             Method::Get => self.get(req),
@@ -176,17 +193,27 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # use pastebin::{DbInterface, DbError};
+/// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
+/// # use std::{error, fmt};
 /// # struct DbImplementation;
+/// # #[derive(Debug)]
+/// # struct FakeError;
+/// # impl error::Error for FakeError {
+/// #     fn description(&self) -> &str {"nothing happened"}
+/// # }
+/// # impl fmt::Display for FakeError {
+/// #     fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {Ok(())}
+/// # }
 /// # impl DbInterface for DbImplementation {
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError> {
+///   # type Error = FakeError;
+///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError> {
+///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), DbError> {
+///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {
@@ -211,17 +238,27 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # use pastebin::{DbInterface, DbError};
+/// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
+/// # use std::{error, fmt};
+/// # #[derive(Debug)]
+/// # struct FakeError;
+/// # impl error::Error for FakeError {
+/// #     fn description(&self) -> &str {"nothing happened"}
+/// # }
+/// # impl fmt::Display for FakeError {
+/// #     fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {Ok(())}
+/// # }
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError> {
+///   # type Error = FakeError;
+///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError> {
+///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), DbError> {
+///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {

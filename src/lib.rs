@@ -26,55 +26,6 @@ extern crate reqwest;
 use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use std::error;
-use std::fmt;
-
-/// A helper type that implements the `std::error::Error` trait to store an arbitrary error.
-///
-/// Use `DbError::new()` to create a new instance.
-///
-/// # Example
-///
-/// ```
-/// use pastebin::DbError;
-/// use std::fs::File;
-///
-/// fn foo() -> Result<File, DbError> {
-///   let f = File::create("/tmp/test").map_err(DbError::new)?;
-///   Ok(f)
-/// }
-/// ```
-#[derive(Debug)]
-pub struct DbError(Box<error::Error + Send + Sync>);
-
-impl fmt::Display for DbError {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Database error: {:?}", self.0)
-    }
-}
-
-impl DbError {
-    /// A helper method that creates a new instance of `DbError` from an arbitrary error.
-    pub fn new<E: error::Error + Send + Sync + 'static>(e: E) -> Self {
-        DbError(Box::new(e))
-    }
-}
-
-impl error::Error for DbError {
-    fn description(&self) -> &str {
-        "Database error"
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        use std::ops::Deref;
-        Some(self.0.deref())
-    }
-}
-
-impl From<DbError> for iron::IronError {
-    fn from(obj: DbError) -> iron::IronError {
-        iron::IronError::new(obj, iron::status::BadRequest)
-    }
-}
 
 /// Interface to a database.
 ///
@@ -82,25 +33,27 @@ impl From<DbError> for iron::IronError {
 /// describe them to be abstract enough to be easily used with just any kind of database, be it
 /// SQL, NoSQL or just a hash table or whatever.
 pub trait DbInterface: Send + Sync {
+    type Error: Send + Sync + error::Error + 'static;
+
     /// Stores the data into the database under a given ID.
     ///
     /// Unique ID has to be generated before calling this method. It might be found to be an extra
     /// burden since usually a database will generate an ID for you, but generating it in advance
     /// actually makes you not to rely on a database to return the generated ID. As of MongoDB, the
     /// identifier is generated on the client side anyhow.
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), DbError>;
+    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error>;
 
     /// Loads data from the database.
     ///
     /// Returns a corresponding data if found, `None` otherwise.
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, DbError>;
+    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error>;
 
     /// Removes data from the database.
     ///
     /// Normally we don't care whether an object exists in the database or not, so an
     /// implementation doesn't have to check that fact, and usually databases are okay with
     /// attempts to remove something that doesn't exist.
-    fn remove_data(&self, id: ObjectId) -> Result<(), DbError>;
+    fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error>;
 
     /// Tells the maximum data size that could be handled.
     ///
