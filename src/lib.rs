@@ -26,6 +26,7 @@ extern crate reqwest;
 use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use std::error;
+use std::fmt;
 
 /// A helper type that implements the `std::error::Error` trait to store an arbitrary error.
 ///
@@ -45,10 +46,33 @@ use std::error;
 #[derive(Debug)]
 pub struct DbError(Box<error::Error + Send + Sync>);
 
+impl fmt::Display for DbError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "Database error: {:?}", self.0)
+    }
+}
+
 impl DbError {
     /// A helper method that creates a new instance of `DbError` from an arbitrary error.
     pub fn new<E: error::Error + Send + Sync + 'static>(e: E) -> Self {
         DbError(Box::new(e))
+    }
+}
+
+impl error::Error for DbError {
+    fn description(&self) -> &str {
+        "Database error"
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        use std::ops::Deref;
+        Some(self.0.deref())
+    }
+}
+
+impl From<DbError> for iron::IronError {
+    fn from(obj: DbError) -> iron::IronError {
+        iron::IronError::new(obj, iron::status::BadRequest)
     }
 }
 

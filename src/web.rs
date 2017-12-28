@@ -2,7 +2,6 @@
 //!
 //! See [run_web](fn.run_web.html) documentation for details.
 
-use DbError;
 use DbInterface;
 use HttpResult;
 use ObjectId;
@@ -16,7 +15,6 @@ use iron::status;
 use std::convert::From;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
-use std::ops::Deref;
 
 quick_error!{
     /// Container for errors that might happen during processing requests.
@@ -54,11 +52,6 @@ quick_error!{
         IdNotFound(id: ObjectId) {
             description("ID not found")
             display("Id {} not found", id)
-        }
-        /// Database error.
-        DbError(err: DbError) {
-            from()
-            cause(err.0.deref())
         }
     }
 }
@@ -109,9 +102,7 @@ impl Pastebin {
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let data = self.db.load_data(id.clone())
-                       .map_err(Into::<Error>::into)?
-                       .ok_or(Error::IdNotFound(id))?;
+        let data = self.db.load_data(id.clone())?.ok_or(Error::IdNotFound(id))?;
         Ok(Response::with((status::Ok, data)))
     }
 
@@ -123,15 +114,14 @@ impl Pastebin {
             Err(e) => panic!{"Error {:?}", e},
         };
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        self.db.store_data(id.clone(), &data)
-            .map_err(Into::<Error>::into)?;
+        self.db.store_data(id.clone(), &data)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
     }
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        self.db.remove_data(id).map_err(Into::<Error>::into)?;
+        self.db.remove_data(id)?;
         Ok(Response::with(status::Ok))
     }
 }
