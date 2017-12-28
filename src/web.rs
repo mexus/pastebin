@@ -71,6 +71,7 @@ impl From<Error> for IronError {
     fn from(err: Error) -> IronError {
         match err {
             e @ Error::IdNotFound(_) => IronError::new(e, status::NotFound),
+            e @ Error::TooBig => IronError::new(e, status::PayloadTooLarge),
             e => IronError::new(e, status::BadRequest),
         }
     }
@@ -123,11 +124,7 @@ impl<E> Pastebin<E>
 
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
-        let data = match load_data(&mut req.body, self.db.max_data_size()) {
-            Ok(data) => data,
-            Err(Error::TooBig) => return Ok(Response::with(status::PayloadTooLarge)),
-            Err(e) => panic!{"Error {:?}", e},
-        };
+        let data = load_data(&mut req.body, self.db.max_data_size())?;
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
         self.db.store_data(id.clone(), &data).map_err(DbError)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
