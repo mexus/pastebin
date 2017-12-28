@@ -59,7 +59,7 @@ fn run() -> Result<(), Error> {
     let db_wrapper = MongoDbWrapper::new(options.db_options.db_name,
                                          options.db_options.collection_name,
                                          mongo_client_pool);
-    let mut _web = pastebin::web::run_web(db_wrapper, options.web_addr)?;
+    pastebin::web::run_web(db_wrapper, options.web_addr)?;
     unreachable!()
 }
 
