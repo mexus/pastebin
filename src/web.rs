@@ -192,18 +192,10 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # extern crate bson;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
-/// # use std::{error, fmt};
+/// # use std::io;
 /// # struct DbImplementation;
-/// # #[derive(Debug)]
-/// # struct FakeError;
-/// # impl error::Error for FakeError {
-/// #     fn description(&self) -> &str {"nothing happened"}
-/// # }
-/// # impl fmt::Display for FakeError {
-/// #     fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {Ok(())}
-/// # }
 /// # impl DbInterface for DbImplementation {
-///   # type Error = FakeError;
+///   # type Error = io::Error;
 ///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
@@ -237,18 +229,10 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # extern crate bson;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
-/// # use std::{error, fmt};
-/// # #[derive(Debug)]
-/// # struct FakeError;
-/// # impl error::Error for FakeError {
-/// #     fn description(&self) -> &str {"nothing happened"}
-/// # }
-/// # impl fmt::Display for FakeError {
-/// #     fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {Ok(())}
-/// # }
+/// # use std::io;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
-///   # type Error = FakeError;
+///   # type Error = io::Error;
 ///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
