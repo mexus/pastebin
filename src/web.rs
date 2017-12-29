@@ -144,7 +144,7 @@ impl<E> Handler for Pastebin<E>
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         match req.method {
             Method::Get => self.get(req),
-            Method::Post => self.post(req),
+            Method::Post | Method::Put => self.post(req),
             Method::Delete => self.remove(req),
             _ => Ok(Response::with(status::MethodNotAllowed)),
         }
