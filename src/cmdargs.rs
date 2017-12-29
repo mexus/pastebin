@@ -47,6 +47,10 @@ pub struct Options {
     pub web_addr: String,
     /// Verbosity level.
     pub verbose: usize,
+    /// Handlebars templates path.
+    pub templates_path: String,
+    /// Handlebars templates extension.
+    pub templates_ext: String,
 }
 
 /// A helper to simplify a creation of a "no argument" error.
@@ -72,12 +76,18 @@ pub fn parse() -> Result<Options, Error> {
     let verbose = args.occurrences_of("VERBOSE") as usize;
     let web_addr = args.value_of("WEB_ADDR").ok_or(no_arg("WEB_ADDR"))?
                        .to_string();
+    let templates_path = args.value_of("TEMPLATES_PATH").ok_or(no_arg("TEMPLATES_PATH"))?
+                             .to_string();
+    let templates_ext = args.value_of("TEMPLATES_EXT").ok_or(no_arg("TEMPLATES_EXT"))?
+                            .to_string();
 
     Ok(Options { db_options: DbOptions { uri,
                                          db_name,
                                          collection_name, },
                  web_addr,
-                 verbose, })
+                 verbose,
+                 templates_path,
+                 templates_ext, })
 }
 
 /// Builds command line arguments.
@@ -112,4 +122,14 @@ fn build_cli() -> clap::App<'static, 'static> {
                                       .required(true)
                                       .default_value("localhost:8000")
                                       .help("Web server address"))
+        .arg(Arg::with_name("TEMPLATES_PATH").long("templates")
+                                              .value_name("path")
+                                              .takes_value(true)
+                                              .required(true)
+                                              .help("Path to the templates folder"))
+        .arg(Arg::with_name("TEMPLATES_EXT").long("templates-ext")
+                                              .value_name("extension")
+                                              .takes_value(true)
+                                              .default_value(".hbs")
+                                              .help("Templates extension"))
 }

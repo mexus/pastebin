@@ -7,15 +7,19 @@ use HttpResult;
 use ObjectId;
 use bson;
 use data_encoding::{self, BASE64URL_NOPAD};
+use handlebars_iron::{HandlebarsEngine, Template};
 use iron;
 use iron::Handler;
 use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
+use mime_guess;
+use std::{error, str};
 use std::convert::From;
-use std::error;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
+use std::path::Path;
+use tree_magic;
 
 quick_error!{
     /// Container for errors that might happen during processing requests.
@@ -53,6 +57,11 @@ quick_error!{
         IdNotFound(id: ObjectId) {
             description("ID not found")
             display("Id {} not found", id)
+        }
+        /// UTF8 conversion error.
+        Utf8(err: str::Utf8Error) {
+            from()
+            cause(err)
         }
     }
 }
@@ -92,6 +101,15 @@ fn id_from_request(req: &Request) -> Result<ObjectId, Error> {
        .and_then(id_from_string)
 }
 
+/// Tries to guess a MIME type from a provided file name.
+fn mime_from_request(req: &Request) -> Option<&'static str> {
+    req.url.as_ref()
+       .path_segments()
+       .and_then(|mut it| it.next())
+       .and_then(|f| Path::new(f).extension().and_then(|s| s.to_str()))
+       .and_then(mime_guess::get_mime_type_str)
+}
+
 /// Decodes string into an ObjectID.
 fn id_from_string(src: &str) -> Result<ObjectId, Error> {
     let dyn_bytes = BASE64URL_NOPAD.decode(src.as_bytes())?;
@@ -105,6 +123,30 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
     Ok(ObjectId::with_bytes(bytes))
 }
 
+/// Checks if a request has been made from a known browser as opposed to a command line client
+/// (like wget or curl).
+fn is_browser(req: &Request) -> bool {
+    req.headers.get::<iron::headers::UserAgent>()
+       .map(|agent| {
+                debug!("User agent: [{}]", agent);
+                agent.contains("Gecko/") || agent.contains("AppleWebKit/")
+                || agent.contains("Opera/") || agent.contains("Trident/")
+                || agent.contains("Chrome/")
+            })
+       .unwrap_or(false)
+}
+
+fn is_text(mime: &str) -> bool {
+    match mime {
+        "text/plain" => true,
+        "text/x-markdown" => true,
+        "text/x-python" => true,
+        "text/x-rust" => true,
+        "application/x-sh" => true,
+        _ => false,
+    }
+}
+
 impl<E> Pastebin<E>
     where E: Send + Sync + error::Error + 'static
 {
@@ -116,17 +158,30 @@ impl<E> Pastebin<E>
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let data = self.db.load_data(id.clone())
-                       .map_err(DbError)?
-                       .ok_or(Error::IdNotFound(id))?;
-        Ok(Response::with((status::Ok, data)))
+        let (data, mime) = self.db.load_data(id.clone())
+                               .map_err(DbError)?
+                               .ok_or(Error::IdNotFound(id))?;
+        debug!("Mime: {}", mime);
+        if is_text(&mime) && is_browser(req) {
+            let mut response = Response::new();
+            response.set_mut(Template::new(
+                "show",
+                json!({"data": str::from_utf8(&data).map_err(Into::<Error>::into)?}),
+            )).set_mut(status::Ok);
+            Ok(response)
+        } else {
+            Ok(Response::with((status::Ok, data)))
+        }
     }
 
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let data = load_data(&mut req.body, self.db.max_data_size())?;
+        let mime_type = mime_from_request(req).map(Into::into)
+                                              .unwrap_or_else(|| tree_magic::from_u8(&data));
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        self.db.store_data(id.clone(), &data).map_err(DbError)?;
+        self.db.store_data(id.clone(), &data, mime_type)
+            .map_err(DbError)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
     }
 
@@ -205,13 +260,13 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {
@@ -242,13 +297,13 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {
@@ -263,10 +318,14 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
 /// ```
-pub fn run_web<Db, A>(db_wrapper: Db, addr: A) -> HttpResult<iron::Listening>
+pub fn run_web<Db, A>(db_wrapper: Db,
+                      addr: A,
+                      handlebars: HandlebarsEngine)
+                      -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
-    let pastebin = Pastebin::new(Box::new(db_wrapper));
-    Iron::new(pastebin).http(addr)
+    let mut chain = Chain::new(Pastebin::new(Box::new(db_wrapper)));
+    chain.link_after(handlebars);
+    Iron::new(chain).http(addr)
 }

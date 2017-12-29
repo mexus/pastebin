@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate bson;
+extern crate handlebars_iron;
 extern crate iron;
 #[macro_use]
 extern crate log;
@@ -12,6 +13,7 @@ extern crate simplelog;
 mod cmdargs;
 mod mongo_impl;
 
+use handlebars_iron::{DirectorySource, HandlebarsEngine};
 use iron::error::HttpError;
 use mongo_driver::MongoError;
 use mongo_driver::client::ClientPool;
@@ -33,6 +35,10 @@ quick_error! {
             from()
         }
         HttpError(err: HttpError) {
+            cause(err)
+            from()
+        }
+        Handlebars(err: handlebars_iron::SourceError) {
             cause(err)
             from()
         }
@@ -59,7 +65,10 @@ fn run() -> Result<(), Error> {
     let db_wrapper = MongoDbWrapper::new(options.db_options.db_name,
                                          options.db_options.collection_name,
                                          mongo_client_pool);
-    pastebin::web::run_web(db_wrapper, options.web_addr)?;
+    let mut handlebars = HandlebarsEngine::new();
+    handlebars.add(Box::new(DirectorySource::new(options.templates_path, options.templates_ext)));
+    handlebars.reload()?;
+    pastebin::web::run_web(db_wrapper, options.web_addr, handlebars)?;
     unreachable!()
 }
 
