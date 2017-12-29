@@ -42,11 +42,11 @@ quick_error! {
 fn init_logs(verbose: usize) -> Result<(), Error> {
     // Set up the logging depending on how many times a '-v' option has been used.
     simplelog::TermLogger::init(match verbose {
-                                    1 => log::LogLevelFilter::Warn,
-                                    2 => log::LogLevelFilter::Info,
-                                    3 => log::LogLevelFilter::Debug,
-                                    4 => log::LogLevelFilter::Trace,
-                                    _ => log::LogLevelFilter::Error,
+                                    1 => simplelog::LogLevelFilter::Warn,
+                                    2 => simplelog::LogLevelFilter::Info,
+                                    3 => simplelog::LogLevelFilter::Debug,
+                                    4 => simplelog::LogLevelFilter::Trace,
+                                    _ => simplelog::LogLevelFilter::Error,
                                 },
                                 Default::default())?;
     Ok(())
