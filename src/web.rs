@@ -7,14 +7,15 @@ use HttpResult;
 use ObjectId;
 use bson;
 use data_encoding::{self, BASE64URL_NOPAD};
+use handlebars_iron::{HandlebarsEngine, Template};
 use iron;
 use iron::Handler;
 use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
 use mime_guess;
+use std::{error, str};
 use std::convert::From;
-use std::error;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
 use std::path::Path;
@@ -56,6 +57,11 @@ quick_error!{
         IdNotFound(id: ObjectId) {
             description("ID not found")
             display("Id {} not found", id)
+        }
+        /// UTF8 conversion error.
+        Utf8(err: str::Utf8Error) {
+            from()
+            cause(err)
         }
     }
 }
@@ -122,11 +128,23 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
 fn is_browser(req: &Request) -> bool {
     req.headers.get::<iron::headers::UserAgent>()
        .map(|agent| {
-                agent.starts_with("Gecko/") || agent.starts_with("AppleWebKit/")
-                || agent.starts_with("Opera/") || agent.starts_with("Trident/")
-                || agent.starts_with("Chrome/")
+                debug!("User agent: [{}]", agent);
+                agent.contains("Gecko/") || agent.contains("AppleWebKit/")
+                || agent.contains("Opera/") || agent.contains("Trident/")
+                || agent.contains("Chrome/")
             })
        .unwrap_or(false)
+}
+
+fn is_text(mime: &str) -> bool {
+    match mime {
+        "text/plain" => true,
+        "text/x-markdown" => true,
+        "text/x-python" => true,
+        "text/x-rust" => true,
+        "application/x-sh" => true,
+        _ => false,
+    }
 }
 
 impl<E> Pastebin<E>
@@ -140,10 +158,20 @@ impl<E> Pastebin<E>
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let (data, _) = self.db.load_data(id.clone())
-                            .map_err(DbError)?
-                            .ok_or(Error::IdNotFound(id))?;
-        Ok(Response::with((status::Ok, data)))
+        let (data, mime) = self.db.load_data(id.clone())
+                               .map_err(DbError)?
+                               .ok_or(Error::IdNotFound(id))?;
+        debug!("Mime: {}", mime);
+        if is_text(&mime) && is_browser(req) {
+            let mut response = Response::new();
+            response.set_mut(Template::new(
+                "show",
+                json!({"data": str::from_utf8(&data).map_err(Into::<Error>::into)?}),
+            )).set_mut(status::Ok);
+            Ok(response)
+        } else {
+            Ok(Response::with((status::Ok, data)))
+        }
     }
 
     /// Handles `POST` requests.
@@ -290,10 +318,14 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
 /// ```
-pub fn run_web<Db, A>(db_wrapper: Db, addr: A) -> HttpResult<iron::Listening>
+pub fn run_web<Db, A>(db_wrapper: Db,
+                      addr: A,
+                      handlebars: HandlebarsEngine)
+                      -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
-    let pastebin = Pastebin::new(Box::new(db_wrapper));
-    Iron::new(pastebin).http(addr)
+    let mut chain = Chain::new(Pastebin::new(Box::new(db_wrapper)));
+    chain.link_after(handlebars);
+    Iron::new(chain).http(addr)
 }
