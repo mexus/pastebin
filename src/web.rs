@@ -254,9 +254,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
+/// # extern crate handlebars_iron;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
+/// # use handlebars_iron::HandlebarsEngine;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -277,8 +279,12 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// #   fn new() -> Self { Self{} }
 /// # }
 /// # fn main() {
-/// let mut web = pastebin::web::run_web(DbImplementation::new(/* ... */),
-///                                      "127.0.0.1:8000").unwrap();
+/// let mut web = pastebin::web::run_web(
+///     DbImplementation::new(/* ... */),
+///     "127.0.0.1:8000",
+///     // ...
+///     # HandlebarsEngine::new()
+///     ).unwrap();
 /// // ... do something ...
 /// web.close(); // Graceful termination.
 /// println!("Server terminated, exiting");
@@ -291,9 +297,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
+/// # extern crate handlebars_iron;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
+/// # use handlebars_iron::HandlebarsEngine;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -314,7 +322,12 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// #   fn new() -> Self { Self{} }
 /// # }
 /// # fn main() {
-/// pastebin::web::run_web(DbImplementation::new(/* ... */), "127.0.0.1:8000").unwrap();
+/// pastebin::web::run_web(
+///     DbImplementation::new(/* ... */),
+///     "127.0.0.1:8000",
+///     // ...
+///     # HandlebarsEngine::new()
+///     ).unwrap();
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
 /// ```

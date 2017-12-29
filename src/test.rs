@@ -1,6 +1,7 @@
 use DbInterface;
 use ObjectId;
 use data_encoding::BASE64URL_NOPAD;
+use handlebars_iron::HandlebarsEngine;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::error;
@@ -79,7 +80,7 @@ fn post() {
 
     let db = FakeDb::new();
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, HandlebarsEngine::new()).unwrap();
 
     let mut response = Client::new().post(connection_addr)
                                     .body(reference_data)
@@ -107,7 +108,7 @@ fn get() {
                 reference_data.as_bytes().to_vec(),
                 "text/plain".into());
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, HandlebarsEngine::new()).unwrap();
 
     let mut response = Client::new().get(connection_addr).send().unwrap();
 
@@ -130,7 +131,7 @@ fn remove() {
                 reference_data.as_bytes().to_vec(),
                 "text/plain".into());
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, HandlebarsEngine::new()).unwrap();
     let response = Client::new().delete(connection_addr).send().unwrap();
     web.close().unwrap();
 
