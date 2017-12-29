@@ -12,10 +12,12 @@ use iron::Handler;
 use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
+use mime_guess;
 use std::convert::From;
 use std::error;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
+use std::path::Path;
 use tree_magic;
 
 quick_error!{
@@ -93,6 +95,15 @@ fn id_from_request(req: &Request) -> Result<ObjectId, Error> {
        .and_then(id_from_string)
 }
 
+/// Tries to guess a MIME type from a provided file name.
+fn mime_from_request(req: &Request) -> Option<&'static str> {
+    req.url.as_ref()
+       .path_segments()
+       .and_then(|mut it| it.next())
+       .and_then(|f| Path::new(f).extension().and_then(|s| s.to_str()))
+       .and_then(mime_guess::get_mime_type_str)
+}
+
 /// Decodes string into an ObjectID.
 fn id_from_string(src: &str) -> Result<ObjectId, Error> {
     let dyn_bytes = BASE64URL_NOPAD.decode(src.as_bytes())?;
@@ -126,7 +137,8 @@ impl<E> Pastebin<E>
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let data = load_data(&mut req.body, self.db.max_data_size())?;
-        let mime_type = tree_magic::from_u8(&data);
+        let mime_type = mime_from_request(req).map(Into::into)
+                                              .unwrap_or_else(|| tree_magic::from_u8(&data));
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
         self.db.store_data(id.clone(), &data, mime_type)
             .map_err(DbError)?;

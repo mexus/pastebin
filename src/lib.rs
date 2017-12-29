@@ -12,6 +12,7 @@
 extern crate bson;
 extern crate data_encoding;
 extern crate iron;
+extern crate mime_guess;
 #[macro_use]
 extern crate quick_error;
 extern crate tree_magic;
