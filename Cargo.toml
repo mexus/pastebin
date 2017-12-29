@@ -1,6 +1,6 @@
 [package]
 name = "pastebin"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["mexus <gilaldpellaeon@gmail.com>"]
 description = "A simple pastebin service"
 license = "GPL-3.0"
@@ -10,7 +10,8 @@ repository = "https://github.com/mexus/pastebin"
 documentation = "https://docs.rs/pastebin/"
 
 [badges]
-maintenance = { status = "experimental" }
+maintenance = { status = "actively-developed" }
+travis-ci = { repository = "mexus/pastebin", branch = "master" }
 
 [dependencies]
 bson = "0.10"
