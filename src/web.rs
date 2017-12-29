@@ -117,6 +117,18 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
     Ok(ObjectId::with_bytes(bytes))
 }
 
+/// Checks if a request has been made from a known browser as opposed to a command line client
+/// (like wget or curl).
+fn is_browser(req: &Request) -> bool {
+    req.headers.get::<iron::headers::UserAgent>()
+       .map(|agent| {
+                agent.starts_with("Gecko/") || agent.starts_with("AppleWebKit/")
+                || agent.starts_with("Opera/") || agent.starts_with("Trident/")
+                || agent.starts_with("Chrome/")
+            })
+       .unwrap_or(false)
+}
+
 impl<E> Pastebin<E>
     where E: Send + Sync + error::Error + 'static
 {
