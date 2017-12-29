@@ -16,6 +16,7 @@ use std::convert::From;
 use std::error;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
+use tree_magic;
 
 quick_error!{
     /// Container for errors that might happen during processing requests.
@@ -116,17 +117,19 @@ impl<E> Pastebin<E>
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let id = id_from_request(req)?;
-        let data = self.db.load_data(id.clone())
-                       .map_err(DbError)?
-                       .ok_or(Error::IdNotFound(id))?;
+        let (data, _) = self.db.load_data(id.clone())
+                            .map_err(DbError)?
+                            .ok_or(Error::IdNotFound(id))?;
         Ok(Response::with((status::Ok, data)))
     }
 
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let data = load_data(&mut req.body, self.db.max_data_size())?;
+        let mime_type = tree_magic::from_u8(&data);
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        self.db.store_data(id.clone(), &data).map_err(DbError)?;
+        self.db.store_data(id.clone(), &data, mime_type)
+            .map_err(DbError)?;
         Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
     }
 
@@ -205,13 +208,13 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {
@@ -242,13 +245,13 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {

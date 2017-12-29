@@ -10,7 +10,7 @@ use web::run_web;
 
 #[derive(Clone)]
 struct FakeDb {
-    storage: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    storage: Arc<Mutex<HashMap<String, (Vec<u8>, String)>>>,
 }
 
 impl FakeDb {
@@ -18,15 +18,15 @@ impl FakeDb {
         Self { storage: Arc::new(Mutex::new(HashMap::new())), }
     }
 
-    fn find_data(&self, id: String) -> Option<Vec<u8>> {
+    fn find_data(&self, id: String) -> Option<(Vec<u8>, String)> {
         self.storage.lock()
             .unwrap()
             .get(&id)
             .map(|data| data.clone())
     }
 
-    fn put_data(&self, id: String, data: Vec<u8>) {
-        self.storage.lock().unwrap().insert(id, data);
+    fn put_data(&self, id: String, data: Vec<u8>, mime: String) {
+        self.storage.lock().unwrap().insert(id, (data, mime));
     }
 }
 
@@ -51,13 +51,12 @@ impl fmt::Display for FakeError {
 impl DbInterface for FakeDb {
     type Error = FakeError;
 
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error> {
-        let mut storage = self.storage.lock().unwrap();
-        storage.insert(oid_to_str(id), data.to_vec());
+    fn store_data(&self, id: ObjectId, data: &[u8], mime: String) -> Result<(), Self::Error> {
+        self.put_data(oid_to_str(id), data.to_vec(), mime);
         Ok(())
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
         Ok(self.find_data(oid_to_str(id)))
     }
 
@@ -76,6 +75,7 @@ fn post() {
     const LISTEN_ADDR: &'static str = "127.0.0.1:8000";
     let connection_addr = &format!("http://{}/", LISTEN_ADDR);
     let reference_data = "lol";
+    let reference_mime = "text/plain";
 
     let db = FakeDb::new();
 
@@ -90,8 +90,9 @@ fn post() {
 
     assert!(response.status().is_success());
     let received_id = response.text().unwrap();
-    assert_eq!(db.find_data(received_id).as_ref().map(|v| v as &[u8]),
-               Some(reference_data.as_bytes()));
+    assert_eq!(db.find_data(received_id).as_ref()
+                 .map(|&(ref v, ref mime)| (v as &[u8], mime)),
+               Some((reference_data.as_bytes(), &reference_mime.to_string())));
 }
 
 #[test]
@@ -102,7 +103,9 @@ fn get() {
     let reference_data = "Ahaha";
 
     let db = FakeDb::new();
-    db.put_data(reference_id.clone(), reference_data.as_bytes().to_vec());
+    db.put_data(reference_id.clone(),
+                reference_data.as_bytes().to_vec(),
+                "text/plain".into());
 
     let mut web = run_web(db.clone(), LISTEN_ADDR).unwrap();
 
@@ -123,7 +126,9 @@ fn remove() {
     let reference_data = "Ahaha";
 
     let db = FakeDb::new();
-    db.put_data(reference_id.clone(), reference_data.as_bytes().to_vec());
+    db.put_data(reference_id.clone(),
+                reference_data.as_bytes().to_vec(),
+                "text/plain".into());
 
     let mut web = run_web(db.clone(), LISTEN_ADDR).unwrap();
     let response = Client::new().delete(connection_addr).send().unwrap();

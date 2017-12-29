@@ -14,6 +14,7 @@ extern crate data_encoding;
 extern crate iron;
 #[macro_use]
 extern crate quick_error;
+extern crate tree_magic;
 
 pub mod web;
 
@@ -41,12 +42,12 @@ pub trait DbInterface: Send + Sync {
     /// burden since usually a database will generate an ID for you, but generating it in advance
     /// actually makes you not to rely on a database to return the generated ID. As of MongoDB, the
     /// identifier is generated on the client side anyhow.
-    fn store_data(&self, id: ObjectId, data: &[u8]) -> Result<(), Self::Error>;
+    fn store_data(&self, id: ObjectId, data: &[u8], mime_type: String) -> Result<(), Self::Error>;
 
     /// Loads data from the database.
     ///
     /// Returns a corresponding data if found, `None` otherwise.
-    fn load_data(&self, id: ObjectId) -> Result<Option<Vec<u8>>, Self::Error>;
+    fn load_data(&self, id: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error>;
 
     /// Removes data from the database.
     ///
