@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate bson;
-extern crate handlebars_iron;
 extern crate iron;
 #[macro_use]
 extern crate log;
@@ -9,15 +8,16 @@ extern crate pastebin;
 #[macro_use]
 extern crate quick_error;
 extern crate simplelog;
+extern crate tera;
 
 mod cmdargs;
 mod mongo_impl;
 
-use handlebars_iron::{DirectorySource, HandlebarsEngine};
 use iron::error::HttpError;
 use mongo_driver::MongoError;
 use mongo_driver::client::ClientPool;
 use mongo_impl::MongoDbWrapper;
+use tera::Tera;
 
 quick_error! {
     #[derive(Debug)]
@@ -38,7 +38,7 @@ quick_error! {
             cause(err)
             from()
         }
-        Handlebars(err: handlebars_iron::SourceError) {
+        Tera(err: tera::Error) {
             cause(err)
             from()
         }
@@ -65,10 +65,10 @@ fn run() -> Result<(), Error> {
     let db_wrapper = MongoDbWrapper::new(options.db_options.db_name,
                                          options.db_options.collection_name,
                                          mongo_client_pool);
-    let mut handlebars = HandlebarsEngine::new();
-    handlebars.add(Box::new(DirectorySource::new(options.templates_path, options.templates_ext)));
-    handlebars.reload()?;
-    pastebin::web::run_web(db_wrapper, options.web_addr, handlebars)?;
+    let templates =
+        Tera::new(&format!("{}/**/*{}", options.templates_path, options.templates_ext))?;
+    println!("{:?}", templates);
+    pastebin::web::run_web(db_wrapper, options.web_addr, templates)?;
     unreachable!()
 }
 

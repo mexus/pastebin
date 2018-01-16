@@ -130,6 +130,6 @@ fn build_cli() -> clap::App<'static, 'static> {
         .arg(Arg::with_name("TEMPLATES_EXT").long("templates-ext")
                                               .value_name("extension")
                                               .takes_value(true)
-                                              .default_value(".hbs")
+                                              .default_value(".tera")
                                               .help("Templates extension"))
 }

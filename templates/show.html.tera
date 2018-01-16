@@ -1,0 +1,29 @@
+{% extends "base.html.tera" %}
+{% block head %}
+    <link
+      rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github-gist.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/rust.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            res = hljs.highlightAuto($('pre').text());
+            $('#contents_type').text(res.language);
+            $('pre').html(res.value)
+            console.log(res)
+        })
+    </script>
+    <link
+      rel="stylesheet"
+      href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/css/bootstrap.min.css"
+      integrity="sha384-Zug+QiDoJOrZ5t4lssLdxGhVrurbmBWopoEl+M6BdEfwnCJZtKxi1KgxUyJq13dy"
+      crossorigin="anonymous">
+{% endblock head %}
+{% block title %}{{id}}{% endblock title %}
+{% block content %}
+    <span title="MIME type" uk-tooltip class="uk-label uk-label-success">{{mime}}</span>
+    <span id="contents_type" title="Contents type" uk-tooltip class="uk-label"></span>
+    <div class="uk-margin-top">
+        <pre style="padding-top: 1em"><code>{{data}}</code></pre>
+    </div>
+{% endblock content %}

@@ -7,9 +7,9 @@ use HttpResult;
 use ObjectId;
 use bson;
 use data_encoding::{self, BASE64URL_NOPAD};
-use handlebars_iron::{HandlebarsEngine, Template};
 use iron;
 use iron::Handler;
+use iron::headers::ContentType;
 use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
@@ -19,6 +19,7 @@ use std::convert::From;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
 use std::path::Path;
+use tera::{self, escape_html, Tera};
 use tree_magic;
 
 quick_error!{
@@ -63,6 +64,11 @@ quick_error!{
             from()
             cause(err)
         }
+        /// Tera rendering error.
+        Tera(err: tera::Error) {
+            from()
+            cause(err)
+        }
     }
 }
 
@@ -86,19 +92,20 @@ impl From<Error> for IronError {
     }
 }
 
-/// An intermediate structure that handles information about a MongoDB connection.
+/// An intermediate structure that handles information about a MongoDB connection and web templates
+/// engine.
 struct Pastebin<E> {
     db: Box<DbInterface<Error = E>>,
+    templates: Tera,
 }
 
-/// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`) and tries to convert it
-/// to an ObjectId.
-fn id_from_request(req: &Request) -> Result<ObjectId, Error> {
+/// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`).
+fn id_from_request(req: &Request) -> Result<String, Error> {
     req.url.as_ref()
        .path_segments()
        .and_then(|mut it| it.next())
        .ok_or(Error::NoIdSegment)
-       .and_then(id_from_string)
+       .map(|s| s.to_string())
 }
 
 /// Tries to guess a MIME type from a provided file name.
@@ -151,23 +158,31 @@ impl<E> Pastebin<E>
     where E: Send + Sync + error::Error + 'static
 {
     /// Initializes a pastebin web server with a database interface.
-    fn new(db: Box<DbInterface<Error = E>>) -> Self {
-        Pastebin { db }
+    fn new(db: Box<DbInterface<Error = E>>, templates: Tera) -> Self {
+        Pastebin { db, templates }
     }
 
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
-        let id = id_from_request(req)?;
+        let str_id = id_from_request(req)?;
+        let id = id_from_string(&str_id)?;
         let (data, mime) = self.db.load_data(id.clone())
                                .map_err(DbError)?
                                .ok_or(Error::IdNotFound(id))?;
         debug!("Mime: {}", mime);
         if is_text(&mime) && is_browser(req) {
             let mut response = Response::new();
-            response.set_mut(Template::new(
-                "show",
-                json!({"data": str::from_utf8(&data).map_err(Into::<Error>::into)?}),
-            )).set_mut(status::Ok);
+            response.headers.set(ContentType::html());
+            response.set_mut(self.templates.render(
+                "show.html.tera",
+                &json!({
+                    "id": escape_html(&str_id),
+                    "mime": escape_html(&mime),
+                    "data": escape_html(str::from_utf8(&data).map_err(Into::<Error>::into)?)
+                }),
+            )
+                                 .map_err(Into::<Error>::into)?)
+                    .set_mut(status::Ok);
             Ok(response)
         } else {
             Ok(Response::with((status::Ok, data)))
@@ -187,7 +202,7 @@ impl<E> Pastebin<E>
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = id_from_request(req)?;
+        let id = id_from_string(&id_from_request(req)?)?;
         self.db.remove_data(id).map_err(DbError)?;
         Ok(Response::with(status::Ok))
     }
@@ -254,11 +269,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # extern crate handlebars_iron;
+/// # extern crate tera;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use handlebars_iron::HandlebarsEngine;
+/// # use tera::Tera;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -283,7 +298,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     DbImplementation::new(/* ... */),
 ///     "127.0.0.1:8000",
 ///     // ...
-///     # HandlebarsEngine::new()
+///     # Tera::default()
 ///     ).unwrap();
 /// // ... do something ...
 /// web.close(); // Graceful termination.
@@ -297,11 +312,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # extern crate handlebars_iron;
+/// # extern crate tera;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use handlebars_iron::HandlebarsEngine;
+/// # use tera::Tera;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -326,19 +341,14 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     DbImplementation::new(/* ... */),
 ///     "127.0.0.1:8000",
 ///     // ...
-///     # HandlebarsEngine::new()
+///     # Tera::default()
 ///     ).unwrap();
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
 /// ```
-pub fn run_web<Db, A>(db_wrapper: Db,
-                      addr: A,
-                      handlebars: HandlebarsEngine)
-                      -> HttpResult<iron::Listening>
+pub fn run_web<Db, A>(db_wrapper: Db, addr: A, templates: Tera) -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
-    let mut chain = Chain::new(Pastebin::new(Box::new(db_wrapper)));
-    chain.link_after(handlebars);
-    Iron::new(chain).http(addr)
+    Iron::new(Pastebin::new(Box::new(db_wrapper), templates)).http(addr)
 }

@@ -11,15 +11,15 @@
 
 extern crate bson;
 extern crate data_encoding;
-extern crate handlebars_iron;
 extern crate iron;
-extern crate mime_guess;
 #[macro_use]
 extern crate log;
+extern crate mime_guess;
 #[macro_use]
 extern crate quick_error;
 #[macro_use]
 extern crate serde_json;
+extern crate tera;
 extern crate tree_magic;
 
 pub mod web;
