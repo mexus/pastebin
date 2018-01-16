@@ -150,6 +150,7 @@ fn is_text(mime: &str) -> bool {
         "text/x-markdown" => true,
         "text/x-python" => true,
         "text/x-rust" => true,
+        "text/x-toml" => true,
         "application/x-sh" => true,
         _ => false,
     }
