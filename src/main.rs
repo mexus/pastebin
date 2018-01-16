@@ -68,7 +68,7 @@ fn run() -> Result<(), Error> {
     let templates =
         Tera::new(&format!("{}/**/*{}", options.templates_path, options.templates_ext))?;
     println!("{:?}", templates);
-    pastebin::web::run_web(db_wrapper, options.web_addr, templates)?;
+    pastebin::web::run_web(db_wrapper, options.web_addr, templates, options.url_prefix)?;
     unreachable!()
 }
 

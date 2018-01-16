@@ -97,6 +97,7 @@ impl From<Error> for IronError {
 struct Pastebin<E> {
     db: Box<DbInterface<Error = E>>,
     templates: Tera,
+    url_prefix: String,
 }
 
 /// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`).
@@ -158,8 +159,10 @@ impl<E> Pastebin<E>
     where E: Send + Sync + error::Error + 'static
 {
     /// Initializes a pastebin web server with a database interface.
-    fn new(db: Box<DbInterface<Error = E>>, templates: Tera) -> Self {
-        Pastebin { db, templates }
+    fn new(db: Box<DbInterface<Error = E>>, templates: Tera, url_prefix: String) -> Self {
+        Pastebin { db,
+                   templates,
+                   url_prefix, }
     }
 
     /// Handles `GET` requests.
@@ -197,7 +200,10 @@ impl<E> Pastebin<E>
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
         self.db.store_data(id.clone(), &data, mime_type)
             .map_err(DbError)?;
-        Ok(Response::with((status::Ok, BASE64URL_NOPAD.encode(&id.bytes()))))
+        Ok(Response::with((status::Ok,
+                          format!("{}{}\n",
+                                   self.url_prefix,
+                                   BASE64URL_NOPAD.encode(&id.bytes())))))
     }
 
     /// Handles `DELETE` requests.
@@ -269,11 +275,9 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # extern crate tera;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use tera::Tera;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -298,7 +302,8 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     DbImplementation::new(/* ... */),
 ///     "127.0.0.1:8000",
 ///     // ...
-///     # Tera::default()
+///     # Default::default(),
+///     # Default::default(),
 ///     ).unwrap();
 /// // ... do something ...
 /// web.close(); // Graceful termination.
@@ -312,11 +317,9 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # extern crate tera;
 /// # use pastebin::DbInterface;
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use tera::Tera;
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -341,14 +344,19 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     DbImplementation::new(/* ... */),
 ///     "127.0.0.1:8000",
 ///     // ...
-///     # Tera::default()
+///     # Default::default(),
+///     # Default::default(),
 ///     ).unwrap();
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
 /// ```
-pub fn run_web<Db, A>(db_wrapper: Db, addr: A, templates: Tera) -> HttpResult<iron::Listening>
+pub fn run_web<Db, A>(db_wrapper: Db,
+                      addr: A,
+                      templates: Tera,
+                      url_prefix: String)
+                      -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
-    Iron::new(Pastebin::new(Box::new(db_wrapper), templates)).http(addr)
+    Iron::new(Pastebin::new(Box::new(db_wrapper), templates, url_prefix)).http(addr)
 }

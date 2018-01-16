@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use tera::Tera;
 use web::run_web;
 
 #[derive(Clone)]
@@ -77,10 +76,13 @@ fn post() {
     let connection_addr = &format!("http://{}/", LISTEN_ADDR);
     let reference_data = "lol";
     let reference_mime = "text/plain";
+    let url_prefix = "prefix://";
 
     let db = FakeDb::new();
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Tera::default()).unwrap();
+    let mut web = run_web(db.clone(),
+                          LISTEN_ADDR, Default::default(),
+                          url_prefix.to_string()).unwrap();
 
     let mut response = Client::new().post(connection_addr)
                                     .body(reference_data)
@@ -90,8 +92,10 @@ fn post() {
     web.close().unwrap();
 
     assert!(response.status().is_success());
-    let received_id = response.text().unwrap();
-    assert_eq!(db.find_data(received_id).as_ref()
+    let received_text = response.text().unwrap();
+    assert!(received_text.starts_with(url_prefix));
+    let (_, received_id) = received_text.split_at(url_prefix.len());
+    assert_eq!(db.find_data(received_id.trim_right().to_string()).as_ref()
                  .map(|&(ref v, ref mime)| (v as &[u8], mime)),
                Some((reference_data.as_bytes(), &reference_mime.to_string())));
 }
@@ -108,7 +112,7 @@ fn get() {
                 reference_data.as_bytes().to_vec(),
                 "text/plain".into());
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Tera::default()).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
 
     let mut response = Client::new().get(connection_addr).send().unwrap();
 
@@ -131,7 +135,7 @@ fn remove() {
                 reference_data.as_bytes().to_vec(),
                 "text/plain".into());
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Tera::default()).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
     let response = Client::new().delete(connection_addr).send().unwrap();
     web.close().unwrap();
 
