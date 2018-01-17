@@ -142,12 +142,8 @@ struct Pastebin<E> {
 
 fn is_text(mime: &str) -> bool {
     match mime {
-        "text/plain" => true,
-        "text/x-markdown" => true,
-        "text/x-python" => true,
-        "text/x-rust" => true,
-        "text/x-toml" => true,
         "application/x-sh" => true,
+        s if s.starts_with("text/") => true,
         _ => false,
     }
 }
