@@ -92,30 +92,54 @@ impl From<Error> for IronError {
     }
 }
 
+/// Convenience functions for a `Request`.
+trait RequestExt {
+    /// Checks if a request has been made from a known browser as opposed to a command line client
+    /// (like wget or curl).
+    fn is_browser(&self) -> bool;
+
+    /// Tries to guess a MIME type from a provided file name.
+    fn mime_from_request(&self) -> Option<&'static str>;
+
+    /// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`).
+    fn id_from_request(&self) -> Result<String, Error>;
+}
+
+impl<'a, 'b> RequestExt for Request<'a, 'b> {
+    fn is_browser(&self) -> bool {
+        self.headers.get::<iron::headers::UserAgent>()
+            .map(|agent| {
+                     debug!("User agent: [{}]", agent);
+                     agent.contains("Gecko/") || agent.contains("AppleWebKit/")
+                     || agent.contains("Opera/") || agent.contains("Trident/")
+                     || agent.contains("Chrome/")
+                 })
+            .unwrap_or(false)
+    }
+
+    fn mime_from_request(&self) -> Option<&'static str> {
+        self.url.as_ref()
+            .path_segments()
+            .and_then(|mut it| it.next())
+            .and_then(|f| Path::new(f).extension().and_then(|s| s.to_str()))
+            .and_then(mime_guess::get_mime_type_str)
+    }
+
+    fn id_from_request(&self) -> Result<String, Error> {
+        self.url.as_ref()
+            .path_segments()
+            .and_then(|mut it| it.next())
+            .ok_or(Error::NoIdSegment)
+            .map(|s| s.to_string())
+    }
+}
+
 /// An intermediate structure that handles information about a MongoDB connection and web templates
 /// engine.
 struct Pastebin<E> {
     db: Box<DbInterface<Error = E>>,
     templates: Tera,
     url_prefix: String,
-}
-
-/// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`).
-fn id_from_request(req: &Request) -> Result<String, Error> {
-    req.url.as_ref()
-       .path_segments()
-       .and_then(|mut it| it.next())
-       .ok_or(Error::NoIdSegment)
-       .map(|s| s.to_string())
-}
-
-/// Tries to guess a MIME type from a provided file name.
-fn mime_from_request(req: &Request) -> Option<&'static str> {
-    req.url.as_ref()
-       .path_segments()
-       .and_then(|mut it| it.next())
-       .and_then(|f| Path::new(f).extension().and_then(|s| s.to_str()))
-       .and_then(mime_guess::get_mime_type_str)
 }
 
 /// Decodes string into an ObjectID.
@@ -129,19 +153,6 @@ fn id_from_string(src: &str) -> Result<ObjectId, Error> {
         bytes[i] = dyn_bytes[i];
     }
     Ok(ObjectId::with_bytes(bytes))
-}
-
-/// Checks if a request has been made from a known browser as opposed to a command line client
-/// (like wget or curl).
-fn is_browser(req: &Request) -> bool {
-    req.headers.get::<iron::headers::UserAgent>()
-       .map(|agent| {
-                debug!("User agent: [{}]", agent);
-                agent.contains("Gecko/") || agent.contains("AppleWebKit/")
-                || agent.contains("Opera/") || agent.contains("Trident/")
-                || agent.contains("Chrome/")
-            })
-       .unwrap_or(false)
 }
 
 fn is_text(mime: &str) -> bool {
@@ -168,13 +179,13 @@ impl<E> Pastebin<E>
 
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
-        let str_id = id_from_request(req)?;
+        let str_id = req.id_from_request()?;
         let id = id_from_string(&str_id)?;
         let (data, mime) = self.db.load_data(id.clone())
                                .map_err(DbError)?
                                .ok_or(Error::IdNotFound(id))?;
         debug!("Mime: {}", mime);
-        if is_text(&mime) && is_browser(req) {
+        if is_text(&mime) && req.is_browser() {
             let mut response = Response::new();
             response.headers.set(ContentType::html());
             response.set_mut(self.templates.render(
@@ -196,8 +207,8 @@ impl<E> Pastebin<E>
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let data = load_data(&mut req.body, self.db.max_data_size())?;
-        let mime_type = mime_from_request(req).map(Into::into)
-                                              .unwrap_or_else(|| tree_magic::from_u8(&data));
+        let mime_type = req.mime_from_request().map(Into::into)
+                           .unwrap_or_else(|| tree_magic::from_u8(&data));
         let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
         self.db.store_data(id.clone(), &data, mime_type)
             .map_err(DbError)?;
@@ -209,7 +220,7 @@ impl<E> Pastebin<E>
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = id_from_string(&id_from_request(req)?)?;
+        let id = id_from_string(&req.id_from_request()?)?;
         self.db.remove_data(id).map_err(DbError)?;
         Ok(Response::with(status::Ok))
     }
