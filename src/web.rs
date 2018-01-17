@@ -72,16 +72,6 @@ quick_error!{
     }
 }
 
-struct DbError<E: Sync + Send + error::Error>(E);
-
-impl<E> From<DbError<E>> for IronError
-    where E: Sync + Send + error::Error + 'static
-{
-    fn from(err: DbError<E>) -> IronError {
-        IronError::new(err.0, status::BadRequest)
-    }
-}
-
 impl From<Error> for IronError {
     fn from(err: Error) -> IronError {
         match err {
@@ -167,23 +157,20 @@ impl<E> Pastebin<E>
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let str_id = req.id_from_request()?;
-        let id = id::id_from_string(&str_id).map_err(Into::<Error>::into)?;
-        let (data, mime) = self.db.load_data(id.clone())
-                               .map_err(DbError)?
-                               .ok_or(Error::IdNotFound(id))?;
+        let id = itry!(id::id_from_string(&str_id));
+        let (data, mime) = itry!(self.db.load_data(id.clone())).ok_or(Error::IdNotFound(id))?;
         debug!("Mime: {}", mime);
         if is_text(&mime) && req.is_browser() {
             let mut response = Response::new();
             response.headers.set(ContentType::html());
-            response.set_mut(self.templates.render(
+            response.set_mut(itry!(self.templates.render(
                 "show.html.tera",
                 &json!({
                     "id": escape_html(&str_id),
                     "mime": escape_html(&mime),
-                    "data": escape_html(str::from_utf8(&data).map_err(Into::<Error>::into)?)
+                    "data": escape_html(itry!(str::from_utf8(&data)))
                 }),
-            )
-                                 .map_err(Into::<Error>::into)?)
+            )))
                     .set_mut(status::Ok);
             Ok(response)
         } else {
@@ -196,9 +183,8 @@ impl<E> Pastebin<E>
         let data = load_data(&mut req.body, self.db.max_data_size())?;
         let mime_type = req.mime_from_request().map(Into::into)
                            .unwrap_or_else(|| tree_magic::from_u8(&data));
-        let id = bson::oid::ObjectId::new().map_err(Into::<Error>::into)?;
-        self.db.store_data(id.clone(), &data, mime_type)
-            .map_err(DbError)?;
+        let id = itry!(bson::oid::ObjectId::new());
+        itry!(self.db.store_data(id.clone(), &data, mime_type));
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
@@ -207,8 +193,8 @@ impl<E> Pastebin<E>
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = id::id_from_string(&req.id_from_request()?).map_err(Into::<Error>::into)?;
-        self.db.remove_data(id).map_err(DbError)?;
+        let id = itry!(id::id_from_string(&req.id_from_request()?));
+        itry!(self.db.remove_data(id));
         Ok(Response::with(status::Ok))
     }
 }

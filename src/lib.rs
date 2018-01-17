@@ -11,6 +11,7 @@
 
 extern crate bson;
 extern crate data_encoding;
+#[macro_use]
 extern crate iron;
 #[macro_use]
 extern crate log;
