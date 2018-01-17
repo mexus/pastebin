@@ -97,12 +97,14 @@ trait RequestExt {
 
 impl<'a, 'b> RequestExt for Request<'a, 'b> {
     fn is_browser(&self) -> bool {
+        lazy_static! {
+            static ref BROWSERS: Vec<&'static str> =
+                vec!["Gecko/", "AppleWebKit/", "Opera/", "Trident/", "Chrome/"];
+        }
         self.headers.get::<iron::headers::UserAgent>()
             .map(|agent| {
                      debug!("User agent: [{}]", agent);
-                     agent.contains("Gecko/") || agent.contains("AppleWebKit/")
-                     || agent.contains("Opera/") || agent.contains("Trident/")
-                     || agent.contains("Chrome/")
+                     BROWSERS.iter().any(|browser| agent.contains(browser))
                  })
             .unwrap_or(false)
     }

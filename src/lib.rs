@@ -14,6 +14,8 @@ extern crate data_encoding;
 #[macro_use]
 extern crate iron;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate mime_guess;
 #[macro_use]
