@@ -1,0 +1,37 @@
+{% extends "base.html.tera" %}
+{% block title %}Upload a paste{% endblock title %}
+{% block head %}
+    <script>
+        function sendData() {
+            $.ajax('/', {
+                'data': $('#paste').val(),
+                'type': 'PUT',
+            })
+            .done(function( paste_url ) {
+                console.log(paste_url);
+                var paste_anchor = $('<a>').attr('href', paste_url).attr('target', '_blank').text(paste_url);
+                var alert_message = $('<p>').append($('<span>').text("Here's your paste url: ")).append(paste_anchor);
+                var new_alert = $('<div>')
+                    .addClass('uk-alert-success')
+                    .append($('<a class="uk-alert-close" uk-close></a>'))
+                    .append(alert_message);
+                UIkit.alert(new_alert, {});
+                new_alert.hide();
+                $('#legend').after(new_alert);
+                new_alert.show(250);
+            });
+        }
+    </script>
+{% endblock head %}
+{% block content %}
+    <form>
+        <fieldset class="uk-fieldset">
+            <legend id="legend" class="uk-legend">What would you like to share today?</legend>
+            <div class="uk-margin">
+                <textarea id="paste" class="uk-textarea" rows="15" placeholder="Dear Santa,"></textarea>
+            </div>
+            <button class="uk-button uk-button-default" onclick="sendData()" type="button">Submit</button>
+        </fieldset>
+    </form>
+{% endblock content %}
+

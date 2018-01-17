@@ -14,7 +14,7 @@ use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
 use mime_guess;
-use serde;
+use serde_json;
 use std::{error, str};
 use std::convert::From;
 use std::io::{self, Read};
@@ -122,7 +122,13 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
         self.url.as_ref()
             .path_segments()
             .and_then(|mut it| it.nth(n))
-            .map(|s| s.to_string())
+            .and_then(|s| {
+                          if s.is_empty() {
+                              None
+                          } else {
+                              Some(s.to_string())
+                          }
+                      })
     }
 }
 
@@ -157,7 +163,7 @@ impl<E> Pastebin<E>
     }
 
     /// Render a template.
-    fn render_template<D: serde::Serialize>(&self, name: &str, data: &D) -> IronResult<Response> {
+    fn render_template(&self, name: &str, data: &serde_json::Value) -> IronResult<Response> {
         let mut response = Response::new();
         response.headers.set(ContentType::html());
         response.set_mut(itry!(self.templates.render(&format!("{}.html.tera", name), data,)))
@@ -177,16 +183,33 @@ impl<E> Pastebin<E>
         )
     }
 
-    /// Handles `GET` requests.
-    fn get(&self, req: &mut Request) -> IronResult<Response> {
-        let str_id = req.url_segment_n(0).ok_or(Error::NoIdSegment)?;
-        let id = itry!(id::id_from_string(&str_id));
-        let (data, mime) = itry!(self.db.load_data(id.clone())).ok_or(Error::IdNotFound(id))?;
+    /// Loads a paste from the database.
+    fn get_paste(&self, id: &str, is_browser: bool) -> IronResult<Response> {
+        debug!("Id: '{}'", id);
+        let object_id = itry!(id::id_from_string(id));
+        let (data, mime) =
+            itry!(self.db.load_data(object_id.clone())).ok_or(Error::IdNotFound(object_id))?;
         debug!("Mime: {}", mime);
-        if is_text(&mime) && req.is_browser() {
-            self.serve_data_html(&str_id, &mime, &data)
+        if is_text(&mime) && is_browser {
+            self.serve_data_html(id, &mime, &data)
         } else {
             Ok(Response::with((status::Ok, data)))
+        }
+    }
+
+    /// Renders the upload form.
+    fn upload_form(&self) -> IronResult<Response> {
+        self.render_template("upload", &json!({}))
+    }
+
+    /// Handles `GET` requests.
+    ///
+    /// If a URI segment is not provided then the upload form is rendered, otherwise the first
+    /// segment is considered to be a paste ID, and hence the paste is fetched from the DB.
+    fn get(&self, req: &mut Request) -> IronResult<Response> {
+        match req.url_segment_n(0) {
+            None => self.upload_form(),
+            Some(id) => self.get_paste(&id, req.is_browser()),
         }
     }
 
