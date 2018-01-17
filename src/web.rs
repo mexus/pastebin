@@ -6,7 +6,7 @@ use DbInterface;
 use HttpResult;
 use ObjectId;
 use bson;
-use data_encoding::{self, BASE64URL_NOPAD};
+use id;
 use iron;
 use iron::Handler;
 use iron::headers::ContentType;
@@ -31,14 +31,14 @@ quick_error!{
             from()
             cause(err)
         }
-        /// ID decoding error.
-        Decoding(err: data_encoding::DecodeError) {
-            from()
-            cause(err)
-        }
         /// Data limit exceeded.
         TooBig {
             description("Too large paste")
+        }
+        /// Id convertion error.
+        IdRelated(err: id::Error) {
+            from()
+            cause(err)
         }
         /// ObjectID conversion error.
         BsonObjId(err: bson::oid::Error) {
@@ -142,19 +142,6 @@ struct Pastebin<E> {
     url_prefix: String,
 }
 
-/// Decodes string into an ObjectID.
-fn id_from_string(src: &str) -> Result<ObjectId, Error> {
-    let dyn_bytes = BASE64URL_NOPAD.decode(src.as_bytes())?;
-    if dyn_bytes.len() != 12 {
-        return Err(Error::BsonIdWrongLength(dyn_bytes.len()));
-    }
-    let mut bytes = [0u8; 12];
-    for i in 0..12usize {
-        bytes[i] = dyn_bytes[i];
-    }
-    Ok(ObjectId::with_bytes(bytes))
-}
-
 fn is_text(mime: &str) -> bool {
     match mime {
         "text/plain" => true,
@@ -180,7 +167,7 @@ impl<E> Pastebin<E>
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let str_id = req.id_from_request()?;
-        let id = id_from_string(&str_id)?;
+        let id = id::id_from_string(&str_id).map_err(Into::<Error>::into)?;
         let (data, mime) = self.db.load_data(id.clone())
                                .map_err(DbError)?
                                .ok_or(Error::IdNotFound(id))?;
@@ -215,12 +202,12 @@ impl<E> Pastebin<E>
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
-                                   BASE64URL_NOPAD.encode(&id.bytes())))))
+                                   id::id_to_string(id)))))
     }
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = id_from_string(&req.id_from_request()?)?;
+        let id = id::id_from_string(&req.id_from_request()?).map_err(Into::<Error>::into)?;
         self.db.remove_data(id).map_err(DbError)?;
         Ok(Response::with(status::Ok))
     }

@@ -24,6 +24,7 @@ extern crate tree_magic;
 
 pub mod web;
 
+mod id;
 #[cfg(test)]
 mod test;
 
