@@ -30,10 +30,6 @@ quick_error! {
             cause(err)
             from()
         }
-        Logger(err: simplelog::TermLogError) {
-            cause(err)
-            from()
-        }
         HttpError(err: HttpError) {
             cause(err)
             from()
@@ -47,14 +43,14 @@ quick_error! {
 
 fn init_logs(verbose: usize) -> Result<(), Error> {
     // Set up the logging depending on how many times a '-v' option has been used.
-    simplelog::TermLogger::init(match verbose {
-                                    1 => simplelog::LogLevelFilter::Warn,
-                                    2 => simplelog::LogLevelFilter::Info,
-                                    3 => simplelog::LogLevelFilter::Debug,
-                                    4 => simplelog::LogLevelFilter::Trace,
-                                    _ => simplelog::LogLevelFilter::Error,
-                                },
-                                Default::default())?;
+    let verbosity = match verbose {
+        1 => simplelog::LogLevelFilter::Warn,
+        2 => simplelog::LogLevelFilter::Info,
+        3 => simplelog::LogLevelFilter::Debug,
+        4 => simplelog::LogLevelFilter::Trace,
+        _ => simplelog::LogLevelFilter::Error,
+    };
+    simplelog::SimpleLogger::init(verbosity, Default::default()).unwrap();
     Ok(())
 }
 
@@ -67,7 +63,6 @@ fn run() -> Result<(), Error> {
                                          mongo_client_pool);
     let templates =
         Tera::new(&format!("{}/**/*{}", options.templates_path, options.templates_ext))?;
-    println!("{:?}", templates);
     pastebin::web::run_web(db_wrapper, options.web_addr, templates, options.url_prefix)?;
     unreachable!()
 }
