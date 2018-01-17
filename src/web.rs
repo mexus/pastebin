@@ -91,8 +91,8 @@ trait RequestExt {
     /// Tries to guess a MIME type from a provided file name.
     fn mime_from_request(&self) -> Option<&'static str>;
 
-    /// Takes the first URI segment (like `ID` in `http://localhost:8000/ID`).
-    fn id_from_request(&self) -> Result<String, Error>;
+    /// Tries to obtain an `n`-th segment of the URI.
+    fn url_segment_n(&self, n: usize) -> Option<String>;
 }
 
 impl<'a, 'b> RequestExt for Request<'a, 'b> {
@@ -117,11 +117,10 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
             .and_then(mime_guess::get_mime_type_str)
     }
 
-    fn id_from_request(&self) -> Result<String, Error> {
+    fn url_segment_n(&self, n: usize) -> Option<String> {
         self.url.as_ref()
             .path_segments()
-            .and_then(|mut it| it.next())
-            .ok_or(Error::NoIdSegment)
+            .and_then(|mut it| it.nth(n))
             .map(|s| s.to_string())
     }
 }
@@ -158,7 +157,7 @@ impl<E> Pastebin<E>
 
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
-        let str_id = req.id_from_request()?;
+        let str_id = req.url_segment_n(0).ok_or(Error::NoIdSegment)?;
         let id = itry!(id::id_from_string(&str_id));
         let (data, mime) = itry!(self.db.load_data(id.clone())).ok_or(Error::IdNotFound(id))?;
         debug!("Mime: {}", mime);
@@ -195,7 +194,7 @@ impl<E> Pastebin<E>
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = itry!(id::id_from_string(&req.id_from_request()?));
+        let id = itry!(id::id_from_string(&req.url_segment_n(0).ok_or(Error::NoIdSegment)?));
         itry!(self.db.remove_data(id));
         Ok(Response::with(status::Ok))
     }
