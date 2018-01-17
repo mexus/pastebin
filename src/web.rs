@@ -14,6 +14,7 @@ use iron::method::Method;
 use iron::prelude::*;
 use iron::status;
 use mime_guess;
+use serde;
 use std::{error, str};
 use std::convert::From;
 use std::io::{self, Read};
@@ -155,6 +156,27 @@ impl<E> Pastebin<E>
                    url_prefix, }
     }
 
+    /// Render a template.
+    fn render_template<D: serde::Serialize>(&self, name: &str, data: &D) -> IronResult<Response> {
+        let mut response = Response::new();
+        response.headers.set(ContentType::html());
+        response.set_mut(itry!(self.templates.render(&format!("{}.html.tera", name), data,)))
+                .set_mut(status::Ok);
+        Ok(response)
+    }
+
+    /// Serves data in a form of HTML.
+    fn serve_data_html(&self, id: &str, mime: &str, data: &[u8]) -> IronResult<Response> {
+        self.render_template(
+            "show",
+            &json!({
+                    "id": escape_html(id),
+                    "mime": escape_html(mime),
+                    "data": escape_html(itry!(str::from_utf8(data)))
+                }),
+        )
+    }
+
     /// Handles `GET` requests.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         let str_id = req.url_segment_n(0).ok_or(Error::NoIdSegment)?;
@@ -162,18 +184,7 @@ impl<E> Pastebin<E>
         let (data, mime) = itry!(self.db.load_data(id.clone())).ok_or(Error::IdNotFound(id))?;
         debug!("Mime: {}", mime);
         if is_text(&mime) && req.is_browser() {
-            let mut response = Response::new();
-            response.headers.set(ContentType::html());
-            response.set_mut(itry!(self.templates.render(
-                "show.html.tera",
-                &json!({
-                    "id": escape_html(&str_id),
-                    "mime": escape_html(&mime),
-                    "data": escape_html(itry!(str::from_utf8(&data)))
-                }),
-            )))
-                    .set_mut(status::Ok);
-            Ok(response)
+            self.serve_data_html(&str_id, &mime, &data)
         } else {
             Ok(Response::with((status::Ok, data)))
         }
