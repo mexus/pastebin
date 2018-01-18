@@ -5,7 +5,7 @@ use bson::oid::ObjectId;
 use mongo_driver::{CommandAndFindOptions, MongoError};
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
-use pastebin::DbInterface;
+use pastebin::{DbInterface, PasteEntry};
 use std::sync::Arc;
 
 /// A MongoDB wrapper.
@@ -49,6 +49,13 @@ impl DbEntry {
             doc.insert("file_name", file_name);
         }
         doc
+    }
+
+    /// Converts the entry into a `PasteEntry`.
+    fn to_paste(self) -> PasteEntry {
+        PasteEntry { data: self.data,
+                     file_name: self.file_name,
+                     mime_type: self.mime_type, }
     }
 
     /// Try to parse a BSON.
@@ -135,9 +142,7 @@ impl DbInterface for MongoDbWrapper {
                           None)
     }
 
-    fn load_data(&self,
-                 id: ObjectId)
-                 -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
         debug!("Looking for a doc id = {:?}", id);
         let filter = doc!("_id": id);
         let collection = self.get_collection();
@@ -149,9 +154,7 @@ impl DbInterface for MongoDbWrapper {
             Some(entry) => entry,
         };
         let db_entry = DbEntry::from_bson(entry)?;
-        Ok(Some((db_entry.data,
-                db_entry.file_name,
-                db_entry.mime_type)))
+        Ok(Some(db_entry.to_paste()))
     }
 
     fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error> {

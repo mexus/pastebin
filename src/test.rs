@@ -1,5 +1,6 @@
 use DbInterface;
 use ObjectId;
+use PasteEntry;
 use data_encoding::BASE64URL_NOPAD;
 use reqwest::Client;
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ use web::run_web;
 
 #[derive(Clone)]
 struct FakeDb {
-    storage: Arc<Mutex<HashMap<String, (Vec<u8>, Option<String>, String)>>>,
+    storage: Arc<Mutex<HashMap<String, PasteEntry>>>,
 }
 
 impl FakeDb {
@@ -18,17 +19,18 @@ impl FakeDb {
         Self { storage: Arc::new(Mutex::new(HashMap::new())), }
     }
 
-    fn find_data(&self, id: String) -> Option<(Vec<u8>, Option<String>, String)> {
+    fn find_data(&self, id: String) -> Option<PasteEntry> {
         self.storage.lock()
             .unwrap()
             .get(&id)
             .map(|data| data.clone())
     }
 
-    fn put_data(&self, id: String, data: Vec<u8>, file_name: Option<String>, mime: String) {
-        self.storage.lock()
-            .unwrap()
-            .insert(id, (data, file_name, mime));
+    fn put_data(&self, id: String, data: Vec<u8>, file_name: Option<String>, mime_type: String) {
+        self.storage.lock().unwrap().insert(id,
+                                            PasteEntry { data,
+                                                         file_name,
+                                                         mime_type, });
     }
 }
 
@@ -63,9 +65,7 @@ impl DbInterface for FakeDb {
         Ok(())
     }
 
-    fn load_data(&self,
-                 id: ObjectId)
-                 -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
+    fn load_data(&self, id: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
         Ok(self.find_data(oid_to_str(id)))
     }
 
@@ -87,18 +87,17 @@ impl DbInterface for FakeDb {
 fn post() {
     const LISTEN_ADDR: &'static str = "127.0.0.1:8000";
     let connection_addr = &format!("http://{}/", LISTEN_ADDR);
-    let reference_data = "lol";
-    let reference_mime = "text/plain";
+    let reference = PasteEntry { data: b"lol".to_vec(),
+                                 file_name: None,
+                                 mime_type: "text/plain".into(), };
     let url_prefix = "prefix://example.com/";
 
     let db = FakeDb::new();
 
-    let mut web = run_web(db.clone(),
-                          LISTEN_ADDR, Default::default(),
-                          url_prefix).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), url_prefix).unwrap();
 
     let mut response = Client::new().post(connection_addr)
-                                    .body(reference_data)
+                                    .body(reference.data.clone())
                                     .send()
                                     .unwrap();
 
@@ -108,9 +107,10 @@ fn post() {
     let received_text = response.text().unwrap();
     assert!(received_text.starts_with(url_prefix));
     let (_, received_id) = received_text.split_at(url_prefix.len());
-    assert_eq!(db.find_data(received_id.trim_right().to_string()).as_ref()
-                 .map(|&(ref v, ref file_name, ref mime)| (v as &[u8], file_name, mime)),
-               Some((reference_data.as_bytes(), &None, &reference_mime.to_string())));
+    let db_entry = db.find_data(received_id.trim_right().to_string()).unwrap();
+    assert_eq!(db_entry.data, reference.data);
+    assert_eq!(db_entry.file_name, reference.file_name);
+    assert_eq!(db_entry.mime_type, reference.mime_type);
 }
 
 #[test]

@@ -201,12 +201,12 @@ impl<E> Pastebin<E>
                 return Ok(Response::with((status::MovedPermanently, Redirect(new_url))));
             }
         }
-        let (data, file_name, mime) =
+        let paste =
             itry!(self.db.load_data(object_id.clone())).ok_or(Error::IdNotFound(object_id))?;
-        if is_text(&mime) && is_browser {
-            self.serve_data_html(id, &mime, file_name, &data)
+        if is_text(&paste.mime_type) && is_browser {
+            self.serve_data_html(id, &paste.mime_type, paste.file_name, &paste.data)
         } else {
-            Ok(Response::with((status::Ok, data)))
+            Ok(Response::with((status::Ok, paste.data)))
         }
     }
 
@@ -217,16 +217,12 @@ impl<E> Pastebin<E>
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         match req.url_segment_n(0).as_ref().map(String::as_str) {
             None => self.render_template("upload.html", ContentType::html(), &json!({})),
-            Some("paste.sh") => {
-                self.render_template("paste.sh",
-                                     ContentType::plaintext(),
-                                     &json!({"prefix": &self.url_prefix}))
-            }
-            Some("readme") => {
-                self.render_template("readme.html",
-                                     ContentType::html(),
-                                     &json!({"prefix": &self.url_prefix}))
-            }
+            Some("paste.sh") => self.render_template("paste.sh",
+                                                     ContentType::plaintext(),
+                                                     &json!({"prefix": &self.url_prefix})),
+            Some("readme") => self.render_template("readme.html",
+                                                   ContentType::html(),
+                                                   &json!({"prefix": &self.url_prefix})),
             Some(id) => self.get_paste(id, req.is_browser(), req.url_segment_n(1).is_some()),
         }
     }
@@ -322,7 +318,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # use pastebin::DbInterface;
+/// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
 /// # struct DbImplementation;
@@ -331,7 +327,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {
@@ -367,7 +363,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
-/// # use pastebin::DbInterface;
+/// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
 /// # struct DbImplementation;
@@ -376,7 +372,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {

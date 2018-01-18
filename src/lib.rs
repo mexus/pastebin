@@ -39,6 +39,17 @@ use bson::oid::ObjectId;
 use iron::error::HttpResult;
 use std::error;
 
+/// A paste representation. As simple as that.
+#[derive(Debug, Clone)]
+pub struct PasteEntry {
+    /// Raw paste data.
+    pub data: Vec<u8>,
+    /// File name associated with the pate, if any.
+    pub file_name: Option<String>,
+    /// Mime type of the paste.
+    pub mime_type: String,
+}
+
 /// Interface to a database.
 ///
 /// To store and retrieve pastes from a database we only need several functions. And we can
@@ -63,9 +74,7 @@ pub trait DbInterface: Send + Sync {
     /// Loads data from the database.
     ///
     /// Returns a corresponding data if found, `None` otherwise.
-    fn load_data(&self,
-                 id: ObjectId)
-                 -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error>;
+    fn load_data(&self, id: ObjectId) -> Result<Option<PasteEntry>, Self::Error>;
 
     /// Gets a file name of a paste (if any).
     fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error>;
