@@ -3,22 +3,32 @@
 {% block head %}
     <script>
         function sendData() {
+            $('#submit_button').hide();
+            $('#spinner').show();
             $.ajax('/', {
                 'data': $('#paste').val(),
                 'type': 'PUT',
+                'timeout': 5000,
             })
             .done(function( paste_url ) {
                 console.log(paste_url);
-                var paste_anchor = $('<a>').attr('href', paste_url).attr('target', '_blank').text(paste_url);
-                var alert_message = $('<p>').append($('<span>').text("Here's your paste url: ")).append(paste_anchor);
+                window.location.replace(paste_url);
+            })
+            .fail(function(){
+                console.log("Request failed");
+                var alert_message =
+                    $('<p>')
+                        .text("We cannot proceed your request right now, please try again later.");
                 var new_alert = $('<div>')
-                    .addClass('uk-alert-success')
+                    .addClass('uk-alert-danger')
                     .append($('<a class="uk-alert-close" uk-close></a>'))
                     .append(alert_message);
                 UIkit.alert(new_alert, {});
                 new_alert.hide();
                 $('#legend').after(new_alert);
                 new_alert.show(250);
+                $('#submit_button').show();
+                $('#spinner').hide();
             });
         }
     </script>
@@ -30,7 +40,8 @@
             <div class="uk-margin">
                 <textarea id="paste" class="uk-textarea" rows="15" placeholder="Dear Santa,"></textarea>
             </div>
-            <button class="uk-button uk-button-default" onclick="sendData()" type="button">Submit</button>
+            <button id="submit_button" class="uk-button uk-button-default" onclick="sendData()" type="button">Submit</button>
+            <div id="spinner" uk-spinner style="display: none"></div>
         </fieldset>
     </form>
 {% endblock content %}
