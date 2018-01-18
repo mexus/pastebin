@@ -237,7 +237,8 @@ impl<E> Pastebin<E>
                                  .map(Into::into)
                                  .unwrap_or_else(|| tree_magic::from_u8(&data));
         let id = itry!(bson::oid::ObjectId::new());
-        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type));
+        // FIXME: best before!
+        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type, None));
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
@@ -318,13 +319,21 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```
 /// # extern crate pastebin;
 /// # extern crate bson;
+/// # extern crate chrono;
 /// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
+/// # use chrono::{DateTime, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
+///   # fn store_data(&self,
+///   #               _id: ObjectId,
+///   #               _data: &[u8],
+///   #               _file_name: Option<String>,
+///   #               _mime_type: String,
+///   #               _best_before: Option<DateTime<Utc>>)
+///   #               -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
@@ -363,13 +372,21 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// ```no_run
 /// # extern crate pastebin;
 /// # extern crate bson;
+/// # extern crate chrono;
 /// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
+/// # use chrono::{DateTime, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
+///   # fn store_data(&self,
+///   #               _id: ObjectId,
+///   #               _data: &[u8],
+///   #               _file_name: Option<String>,
+///   #               _mime_type: String,
+///   #               _best_before: Option<DateTime<Utc>>)
+///   #               -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {

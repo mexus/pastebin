@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate bson;
+extern crate chrono;
 extern crate iron;
 #[macro_use]
 extern crate log;

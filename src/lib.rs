@@ -10,6 +10,7 @@
 //! useful examples are also there.
 
 extern crate bson;
+extern crate chrono;
 extern crate data_encoding;
 #[macro_use]
 extern crate iron;
@@ -36,6 +37,7 @@ mod test;
 extern crate reqwest;
 
 use bson::oid::ObjectId;
+use chrono::{DateTime, Utc};
 use iron::error::HttpResult;
 use std::error;
 
@@ -48,6 +50,8 @@ pub struct PasteEntry {
     pub file_name: Option<String>,
     /// Mime type of the paste.
     pub mime_type: String,
+    /// Expiration date, if any.
+    pub best_before: Option<DateTime<Utc>>,
 }
 
 /// Interface to a database.
@@ -68,7 +72,8 @@ pub trait DbInterface: Send + Sync {
                   id: ObjectId,
                   data: &[u8],
                   file_name: Option<String>,
-                  mime_type: String)
+                  mime_type: String,
+                  best_before: Option<DateTime<Utc>>)
                   -> Result<(), Self::Error>;
 
     /// Loads data from the database.

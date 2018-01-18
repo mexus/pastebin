@@ -1,6 +1,7 @@
 use DbInterface;
 use ObjectId;
 use PasteEntry;
+use chrono::{DateTime, Utc};
 use data_encoding::BASE64URL_NOPAD;
 use reqwest::Client;
 use std::collections::HashMap;
@@ -26,11 +27,17 @@ impl FakeDb {
             .map(|data| data.clone())
     }
 
-    fn put_data(&self, id: String, data: Vec<u8>, file_name: Option<String>, mime_type: String) {
+    fn put_data(&self,
+                id: String,
+                data: Vec<u8>,
+                file_name: Option<String>,
+                mime_type: String,
+                best_before: Option<DateTime<Utc>>) {
         self.storage.lock().unwrap().insert(id,
                                             PasteEntry { data,
                                                          file_name,
-                                                         mime_type, });
+                                                         mime_type,
+                                                         best_before, });
     }
 }
 
@@ -59,9 +66,10 @@ impl DbInterface for FakeDb {
                   id: ObjectId,
                   data: &[u8],
                   file_name: Option<String>,
-                  mime: String)
+                  mime: String,
+                  expires_at: Option<DateTime<Utc>>)
                   -> Result<(), Self::Error> {
-        self.put_data(oid_to_str(id), data.to_vec(), file_name, mime);
+        self.put_data(oid_to_str(id), data.to_vec(), file_name, mime, expires_at);
         Ok(())
     }
 
@@ -89,7 +97,8 @@ fn post() {
     let connection_addr = &format!("http://{}/", LISTEN_ADDR);
     let reference = PasteEntry { data: b"lol".to_vec(),
                                  file_name: None,
-                                 mime_type: "text/plain".into(), };
+                                 mime_type: "text/plain".into(),
+                                 best_before: None, };
     let url_prefix = "prefix://example.com/";
 
     let db = FakeDb::new();
@@ -124,7 +133,8 @@ fn get() {
     db.put_data(reference_id.clone(),
                 reference_data.as_bytes().to_vec(),
                 None,
-                "text/plain".into());
+                "text/plain".into(),
+                None);
 
     let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
 
@@ -148,7 +158,8 @@ fn remove() {
     db.put_data(reference_id.clone(),
                 reference_data.as_bytes().to_vec(),
                 None,
-                "text/plain".into());
+                "text/plain".into(),
+                None);
 
     let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
     let response = Client::new().delete(connection_addr).send().unwrap();

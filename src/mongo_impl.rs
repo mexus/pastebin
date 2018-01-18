@@ -2,6 +2,7 @@
 
 use bson::{self, Bson};
 use bson::oid::ObjectId;
+use chrono::{DateTime, Utc};
 use mongo_driver::{CommandAndFindOptions, MongoError};
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
@@ -36,6 +37,7 @@ struct DbEntry {
     data: Vec<u8>,
     file_name: Option<String>,
     mime_type: String,
+    best_before: Option<DateTime<Utc>>,
 }
 
 impl From<DbEntry> for bson::Document {
@@ -56,7 +58,8 @@ impl From<DbEntry> for PasteEntry {
     fn from(entry: DbEntry) -> PasteEntry {
         PasteEntry { data: entry.data,
                      file_name: entry.file_name,
-                     mime_type: entry.mime_type, }
+                     mime_type: entry.mime_type,
+                     best_before: entry.best_before, }
     }
 }
 
@@ -67,6 +70,7 @@ impl DbEntry {
         let mut data = None;
         let mut file_name = None;
         let mut mime_type = None;
+        let mut best_before = None;
         let wrong_type = |field, val: bson::Bson, expected| {
             let msg = format!("Field `{}`, expected type {}, got {:?}",
                               field,
@@ -96,13 +100,18 @@ impl DbEntry {
                 ("file_name", val) => {
                     return wrong_type("file_name", val, "string");
                 }
+                ("best_before", bson::Bson::UtcDatetime(date)) => best_before = Some(date),
+                ("best_before", val) => {
+                    return wrong_type("best_before", val, "UtcDatetime");
+                }
                 _ => return Err(bson::DecoderError::UnknownField(key)),
             }
         }
         Ok(DbEntry { id: id.ok_or(bson::DecoderError::ExpectedField("_id"))?,
                      data: data.ok_or(bson::DecoderError::ExpectedField("data"))?,
                      file_name,
-                     mime_type: mime_type.ok_or(bson::DecoderError::ExpectedField("mime_type"))?, })
+                     mime_type: mime_type.ok_or(bson::DecoderError::ExpectedField("mime_type"))?,
+                     best_before, })
     }
 }
 
@@ -135,13 +144,15 @@ impl DbInterface for MongoDbWrapper {
                   id: ObjectId,
                   data: &[u8],
                   file_name: Option<String>,
-                  mime_type: String)
+                  mime_type: String,
+                  best_before: Option<DateTime<Utc>>)
                   -> Result<(), Self::Error> {
         let collection = self.get_collection();
         collection.insert(&DbEntry { id,
                                      data: data.to_vec(),
                                      file_name,
-                                     mime_type, }.into(),
+                                     mime_type,
+                                     best_before, }.into(),
                           None)
     }
 
