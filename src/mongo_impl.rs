@@ -2,7 +2,7 @@
 
 use bson::{self, Bson};
 use bson::oid::ObjectId;
-use mongo_driver::MongoError;
+use mongo_driver::{CommandAndFindOptions, MongoError};
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
 use pastebin::DbInterface;
@@ -96,6 +96,28 @@ impl DbEntry {
     }
 }
 
+/// Try to parse a BSON to extract only the file name (if any).
+fn filename_from_bson(doc: bson::Document) -> Result<Option<String>, bson::DecoderError> {
+    let mut file_name = None;
+    let wrong_type = |field, val: bson::Bson, expected| {
+        let msg = format!("Field `{}`, expected type {}, got {:?}",
+                          field,
+                          expected,
+                          val.element_type());
+        Err(bson::DecoderError::InvalidType(msg))
+    };
+    for (key, bson_value) in doc {
+        match (key.as_str(), bson_value) {
+            ("file_name", bson::Bson::String(fname)) => file_name = Some(fname),
+            ("file_name", val) => {
+                return wrong_type("file_name", val, "string");
+            }
+            _ => {}
+        }
+    }
+    Ok(file_name)
+}
+
 impl DbInterface for MongoDbWrapper {
     type Error = MongoError;
 
@@ -130,6 +152,21 @@ impl DbInterface for MongoDbWrapper {
         Ok(Some((db_entry.data,
                 db_entry.file_name,
                 db_entry.mime_type)))
+    }
+
+    fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error> {
+        debug!("Looking for a file name for id = {:?}", id);
+        let filter = doc!("_id": id);
+        let collection = self.get_collection();
+        let find_options = CommandAndFindOptions::with_fields(doc!("_id": 0, "file_name": 1));
+        let entry = match collection.find(&filter, Some(&find_options))?
+                                    .nth(0)
+                                    .and_then(|doc| doc.ok())
+        {
+            None => return Ok(None),
+            Some(entry) => entry,
+        };
+        Ok(filename_from_bson(entry)?)
     }
 
     fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {

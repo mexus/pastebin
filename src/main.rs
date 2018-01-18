@@ -63,7 +63,7 @@ fn run() -> Result<(), Error> {
                                          mongo_client_pool);
     let templates =
         Tera::new(&format!("{}/**/*{}", options.templates_path, options.templates_ext))?;
-    pastebin::web::run_web(db_wrapper, options.web_addr, templates, options.url_prefix)?;
+    pastebin::web::run_web(db_wrapper, options.web_addr, templates, &options.url_prefix)?;
     unreachable!()
 }
 

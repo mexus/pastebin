@@ -50,7 +50,11 @@ paste. That address should be used later to manipulate the paste.
 
 To download data send a `GET` request to `/id`, where `id` is a paste ID
 obtained on the previous step. Actually you don't have to specifically obtain an
-ID, just use the returned link as it is.
+ID, just use the returned link as it is. If the paste has information about its
+file name the service will redirect the request to `/id/file-name` so you'll be
+able to save the file under the correct name.
+
+You can optionally provide a desired file name like `/id/file-name`.
 
 To delete a paste send a `DELETE` request to `/id`, and the paste will be
 deleted (if it exists obviously).

@@ -7,12 +7,11 @@ use HttpResult;
 use ObjectId;
 use bson;
 use id;
-use iron;
-use iron::Handler;
+use iron::{self, status, Handler, Url};
 use iron::headers::ContentType;
 use iron::method::Method;
+use iron::modifiers::Redirect;
 use iron::prelude::*;
-use iron::status;
 use mime_guess;
 use serde_json;
 use std::{error, str};
@@ -69,6 +68,11 @@ quick_error!{
         Tera(err: tera::Error) {
             from()
             cause(err)
+        }
+        /// URL parsing error.
+        Url(err: String) {
+            description("Can't parse URL")
+            display("Can't parse URL: {}", err)
         }
     }
 }
@@ -186,13 +190,19 @@ impl<E> Pastebin<E>
     }
 
     /// Loads a paste from the database.
-    fn get_paste(&self, id: &str, is_browser: bool) -> IronResult<Response> {
+    fn get_paste(&self, id: &str, is_browser: bool, name_provided: bool) -> IronResult<Response> {
         debug!("Id: '{}'", id);
         let object_id = itry!(id::id_from_string(id));
+        if !name_provided {
+            if let Some(name) = itry!(self.db.get_file_name(object_id.clone())) {
+                let new_url =
+                    Url::parse(&format!("{}{}/{}", self.url_prefix, id, name))
+                        .map_err(|e| Error::Url(e))?;
+                return Ok(Response::with((status::MovedPermanently, Redirect(new_url))));
+            }
+        }
         let (data, file_name, mime) =
             itry!(self.db.load_data(object_id.clone())).ok_or(Error::IdNotFound(object_id))?;
-        debug!("Mime: {}", mime);
-        debug!("File name: {:?}", file_name);
         if is_text(&mime) && is_browser {
             self.serve_data_html(id, &mime, file_name, &data)
         } else {
@@ -207,13 +217,17 @@ impl<E> Pastebin<E>
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         match req.url_segment_n(0).as_ref().map(String::as_str) {
             None => self.render_template("upload.html", ContentType::html(), &json!({})),
-            Some("paste.sh") => self.render_template("paste.sh",
-                                                     ContentType::plaintext(),
-                                                     &json!({"prefix": &self.url_prefix})),
-            Some("readme") => self.render_template("readme.html",
-                                                   ContentType::html(),
-                                                   &json!({"prefix": &self.url_prefix})),
-            Some(id) => self.get_paste(id, req.is_browser()),
+            Some("paste.sh") => {
+                self.render_template("paste.sh",
+                                     ContentType::plaintext(),
+                                     &json!({"prefix": &self.url_prefix}))
+            }
+            Some("readme") => {
+                self.render_template("readme.html",
+                                     ContentType::html(),
+                                     &json!({"prefix": &self.url_prefix}))
+            }
+            Some(id) => self.get_paste(id, req.is_browser(), req.url_segment_n(1).is_some()),
         }
     }
 
@@ -295,6 +309,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// forever in its `drop` implementation. For more details have a look at the
 /// `iron::error::HttpResult` documentation.
 ///
+/// # Notice
+///
+/// * No matter how many ending slashes you added to `url_prefix` (even zero), all of them will be
+///   removed and one slash will be added.
+///
 /// # Example
 ///
 /// Let's say you have some kind of a database wrapper implemented (`DbImplementation`) and you
@@ -313,6 +332,9 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
+///   #   unimplemented!()
+///   # }
+///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
@@ -357,6 +379,9 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
+///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {
+///   #   unimplemented!()
+///   # }
 ///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
@@ -381,10 +406,13 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 pub fn run_web<Db, A>(db_wrapper: Db,
                       addr: A,
                       templates: Tera,
-                      url_prefix: String)
+                      url_prefix: &str)
                       -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
-    Iron::new(Pastebin::new(Box::new(db_wrapper), templates, url_prefix)).http(addr)
+    // Make sure there is only one trailing slash.
+    let url_prefix = format!("{}/", url_prefix.trim_right_matches('/'));
+    let pastebin = Pastebin::new(Box::new(db_wrapper), templates, url_prefix);
+    Iron::new(pastebin).http(addr)
 }

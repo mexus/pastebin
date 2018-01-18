@@ -67,6 +67,9 @@ pub trait DbInterface: Send + Sync {
                  id: ObjectId)
                  -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error>;
 
+    /// Gets a file name of a paste (if any).
+    fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error>;
+
     /// Removes data from the database.
     ///
     /// Normally we don't care whether an object exists in the database or not, so an

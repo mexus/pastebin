@@ -69,6 +69,10 @@ impl DbInterface for FakeDb {
         Ok(self.find_data(oid_to_str(id)))
     }
 
+    fn get_file_name(&self, _id: ObjectId) -> Result<Option<String>, Self::Error> {
+        Ok(None)
+    }
+
     fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {
         self.storage.lock().unwrap().remove(&oid_to_str(id));
         Ok(())
@@ -85,13 +89,13 @@ fn post() {
     let connection_addr = &format!("http://{}/", LISTEN_ADDR);
     let reference_data = "lol";
     let reference_mime = "text/plain";
-    let url_prefix = "prefix://";
+    let url_prefix = "prefix://example.com/";
 
     let db = FakeDb::new();
 
     let mut web = run_web(db.clone(),
                           LISTEN_ADDR, Default::default(),
-                          url_prefix.to_string()).unwrap();
+                          url_prefix).unwrap();
 
     let mut response = Client::new().post(connection_addr)
                                     .body(reference_data)
