@@ -89,9 +89,6 @@ trait RequestExt {
     /// (like wget or curl).
     fn is_browser(&self) -> bool;
 
-    /// Tries to guess a MIME type from a provided file name.
-    fn mime_from_request(&self) -> Option<&'static str>;
-
     /// Tries to obtain an `n`-th segment of the URI.
     fn url_segment_n(&self, n: usize) -> Option<String>;
 }
@@ -110,14 +107,6 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
             .unwrap_or(false)
     }
 
-    fn mime_from_request(&self) -> Option<&'static str> {
-        self.url.as_ref()
-            .path_segments()
-            .and_then(|mut it| it.next())
-            .and_then(|f| Path::new(f).extension().and_then(|s| s.to_str()))
-            .and_then(mime_guess::get_mime_type_str)
-    }
-
     fn url_segment_n(&self, n: usize) -> Option<String> {
         self.url.as_ref()
             .path_segments()
@@ -130,6 +119,12 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
                           }
                       })
     }
+}
+
+fn mime_from_file_name<P: AsRef<str>>(name: P) -> Option<&'static str> {
+    Path::new(name.as_ref()).extension()
+                            .and_then(|s| s.to_str())
+                            .and_then(mime_guess::get_mime_type_str)
 }
 
 /// An intermediate structure that handles information about a MongoDB connection and web templates
@@ -168,12 +163,18 @@ impl<E> Pastebin<E>
     }
 
     /// Serves data in a form of HTML.
-    fn serve_data_html(&self, id: &str, mime: &str, data: &[u8]) -> IronResult<Response> {
+    fn serve_data_html(&self,
+                       id: &str,
+                       mime: &str,
+                       file_name: Option<String>,
+                       data: &[u8])
+                       -> IronResult<Response> {
         self.render_template(
             "show",
             &json!({
                     "id": escape_html(id),
                     "mime": escape_html(mime),
+                    "file_name": file_name.map(|s| escape_html(&s)),
                     "data": escape_html(itry!(str::from_utf8(data)))
                 }),
         )
@@ -183,11 +184,12 @@ impl<E> Pastebin<E>
     fn get_paste(&self, id: &str, is_browser: bool) -> IronResult<Response> {
         debug!("Id: '{}'", id);
         let object_id = itry!(id::id_from_string(id));
-        let (data, mime) =
+        let (data, file_name, mime) =
             itry!(self.db.load_data(object_id.clone())).ok_or(Error::IdNotFound(object_id))?;
         debug!("Mime: {}", mime);
+        debug!("File name: {:?}", file_name);
         if is_text(&mime) && is_browser {
-            self.serve_data_html(id, &mime, &data)
+            self.serve_data_html(id, &mime, file_name, &data)
         } else {
             Ok(Response::with((status::Ok, data)))
         }
@@ -211,11 +213,15 @@ impl<E> Pastebin<E>
 
     /// Handles `POST` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
+        let file_name = req.url_segment_n(0);
+        debug!("File name: {:?}", file_name);
         let data = load_data(&mut req.body, self.db.max_data_size())?;
-        let mime_type = req.mime_from_request().map(Into::into)
-                           .unwrap_or_else(|| tree_magic::from_u8(&data));
+        let mime_type = file_name.as_ref()
+                                 .and_then(mime_from_file_name)
+                                 .map(Into::into)
+                                 .unwrap_or_else(|| tree_magic::from_u8(&data));
         let id = itry!(bson::oid::ObjectId::new());
-        itry!(self.db.store_data(id.clone(), &data, mime_type));
+        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type));
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
@@ -297,10 +303,10 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
@@ -339,10 +345,10 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
-///   # fn store_data(&self, _: ObjectId, _: &[u8], _: String) -> Result<(), Self::Error> {
+///   # fn store_data(&self, _: ObjectId, _: &[u8], _: Option<String>, _: String) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
+///   # fn load_data(&self, _: ObjectId) -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {

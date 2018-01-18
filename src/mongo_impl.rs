@@ -33,23 +33,29 @@ impl MongoDbWrapper {
 struct DbEntry {
     id: ObjectId,
     data: Vec<u8>,
+    file_name: Option<String>,
     mime_type: String,
 }
 
 impl DbEntry {
     /// Convert the entry into a BSON document.
     fn to_bson(self) -> bson::Document {
-        doc!{
+        let mut doc = doc!{
             "_id": self.id,
             "data": Bson::Binary(bson::spec::BinarySubtype::Generic, self.data),
             "mime_type": self.mime_type,
+        };
+        if let Some(file_name) = self.file_name {
+            doc.insert("file_name", file_name);
         }
+        doc
     }
 
     /// Try to parse a BSON.
     fn from_bson(doc: bson::Document) -> Result<Self, bson::DecoderError> {
         let mut id = None;
         let mut data = None;
+        let mut file_name = None;
         let mut mime_type = None;
         let wrong_type = |field, val: bson::Bson, expected| {
             let msg = format!("Field `{}`, expected type {}, got {:?}",
@@ -76,11 +82,16 @@ impl DbEntry {
                 ("mime_type", val) => {
                     return wrong_type("mime_type", val, "string");
                 }
+                ("file_name", bson::Bson::String(fname)) => file_name = Some(fname),
+                ("file_name", val) => {
+                    return wrong_type("file_name", val, "string");
+                }
                 _ => return Err(bson::DecoderError::UnknownField(key)),
             }
         }
         Ok(DbEntry { id: id.ok_or(bson::DecoderError::ExpectedField("_id"))?,
                      data: data.ok_or(bson::DecoderError::ExpectedField("data"))?,
+                     file_name,
                      mime_type: mime_type.ok_or(bson::DecoderError::ExpectedField("mime_type"))?, })
     }
 }
@@ -88,15 +99,23 @@ impl DbEntry {
 impl DbInterface for MongoDbWrapper {
     type Error = MongoError;
 
-    fn store_data(&self, id: ObjectId, data: &[u8], mime_type: String) -> Result<(), Self::Error> {
+    fn store_data(&self,
+                  id: ObjectId,
+                  data: &[u8],
+                  file_name: Option<String>,
+                  mime_type: String)
+                  -> Result<(), Self::Error> {
         let collection = self.get_collection();
         collection.insert(&DbEntry { id,
                                      data: data.to_vec(),
+                                     file_name,
                                      mime_type, }.to_bson(),
                           None)
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
+    fn load_data(&self,
+                 id: ObjectId)
+                 -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
         debug!("Looking for a doc id = {:?}", id);
         let filter = doc!("_id": id);
         let collection = self.get_collection();
@@ -108,7 +127,9 @@ impl DbInterface for MongoDbWrapper {
             Some(entry) => entry,
         };
         let db_entry = DbEntry::from_bson(entry)?;
-        Ok(Some((db_entry.data, db_entry.mime_type)))
+        Ok(Some((db_entry.data,
+                db_entry.file_name,
+                db_entry.mime_type)))
     }
 
     fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error> {

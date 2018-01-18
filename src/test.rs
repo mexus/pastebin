@@ -10,7 +10,7 @@ use web::run_web;
 
 #[derive(Clone)]
 struct FakeDb {
-    storage: Arc<Mutex<HashMap<String, (Vec<u8>, String)>>>,
+    storage: Arc<Mutex<HashMap<String, (Vec<u8>, Option<String>, String)>>>,
 }
 
 impl FakeDb {
@@ -18,15 +18,17 @@ impl FakeDb {
         Self { storage: Arc::new(Mutex::new(HashMap::new())), }
     }
 
-    fn find_data(&self, id: String) -> Option<(Vec<u8>, String)> {
+    fn find_data(&self, id: String) -> Option<(Vec<u8>, Option<String>, String)> {
         self.storage.lock()
             .unwrap()
             .get(&id)
             .map(|data| data.clone())
     }
 
-    fn put_data(&self, id: String, data: Vec<u8>, mime: String) {
-        self.storage.lock().unwrap().insert(id, (data, mime));
+    fn put_data(&self, id: String, data: Vec<u8>, file_name: Option<String>, mime: String) {
+        self.storage.lock()
+            .unwrap()
+            .insert(id, (data, file_name, mime));
     }
 }
 
@@ -51,12 +53,19 @@ impl fmt::Display for FakeError {
 impl DbInterface for FakeDb {
     type Error = FakeError;
 
-    fn store_data(&self, id: ObjectId, data: &[u8], mime: String) -> Result<(), Self::Error> {
-        self.put_data(oid_to_str(id), data.to_vec(), mime);
+    fn store_data(&self,
+                  id: ObjectId,
+                  data: &[u8],
+                  file_name: Option<String>,
+                  mime: String)
+                  -> Result<(), Self::Error> {
+        self.put_data(oid_to_str(id), data.to_vec(), file_name, mime);
         Ok(())
     }
 
-    fn load_data(&self, id: ObjectId) -> Result<Option<(Vec<u8>, String)>, Self::Error> {
+    fn load_data(&self,
+                 id: ObjectId)
+                 -> Result<Option<(Vec<u8>, Option<String>, String)>, Self::Error> {
         Ok(self.find_data(oid_to_str(id)))
     }
 
@@ -96,8 +105,8 @@ fn post() {
     assert!(received_text.starts_with(url_prefix));
     let (_, received_id) = received_text.split_at(url_prefix.len());
     assert_eq!(db.find_data(received_id.trim_right().to_string()).as_ref()
-                 .map(|&(ref v, ref mime)| (v as &[u8], mime)),
-               Some((reference_data.as_bytes(), &reference_mime.to_string())));
+                 .map(|&(ref v, ref file_name, ref mime)| (v as &[u8], file_name, mime)),
+               Some((reference_data.as_bytes(), &None, &reference_mime.to_string())));
 }
 
 #[test]
@@ -110,6 +119,7 @@ fn get() {
     let db = FakeDb::new();
     db.put_data(reference_id.clone(),
                 reference_data.as_bytes().to_vec(),
+                None,
                 "text/plain".into());
 
     let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
@@ -133,6 +143,7 @@ fn remove() {
     let db = FakeDb::new();
     db.put_data(reference_id.clone(),
                 reference_data.as_bytes().to_vec(),
+                None,
                 "text/plain".into());
 
     let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();

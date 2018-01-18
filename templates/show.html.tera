@@ -19,10 +19,13 @@
       integrity="sha384-Zug+QiDoJOrZ5t4lssLdxGhVrurbmBWopoEl+M6BdEfwnCJZtKxi1KgxUyJq13dy"
       crossorigin="anonymous">
 {% endblock head %}
-{% block title %}{{id}}{% endblock title %}
+{% block title %} {% if file_name %}{{file_name}}{% else %}{{id}}{% endif %}{% endblock title %}
 {% block content %}
     <span title="MIME type" uk-tooltip class="uk-label uk-label-success">{{mime}}</span>
     <span id="contents_type" title="Contents type" uk-tooltip class="uk-label"></span>
+    {% if file_name %}
+    <p><span title="File name" uk-tooltip class="uk-label uk-label-warning">{{file_name}}</span></p>
+    {% endif %}
     <div class="uk-margin-top">
         <pre style="padding-top: 1em"><code>{{data}}</code></pre>
     </div>
