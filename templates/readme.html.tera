@@ -1,0 +1,58 @@
+{% extends "base.html.tera" %}
+{% block title %}Where am I?{% endblock title %}
+{% block content %}
+    <h1 class="uk-heading-divider">A pastebin server on Rust</h1>
+    <p>An easy to use pastebin server. Easy to use either from a command line and from a browser.</p>
+
+    <h2 class="uk-heading-bullet">Command Line Interface</h2>
+    <p>Obviously the most convenient way to use anything in this world is the command line.</p>
+    <p>Well, okay, I'm kidding. But a lot of people spend a lot of hours in their command lines
+       (me as well), so this matter is heavily considered. Actually it was built while keeping
+       cli-accessibility in mind.</p>
+    <h3>Uploading data</h3>
+    <p>A suggested way to use the service from a command line is `curl`:</p>
+    <div>
+        <pre>curl --upload-file /etc/profile {{prefix}}</pre>
+    </div>
+    <p>… to paste a file, or</p>
+    <div>
+        <pre>&lt;some command&gt; | curl -F c=@- {{prefix}}</pre>
+    </div>
+    <p>… to paste an output of an arbitrary command.</p>
+    <p>Here's a short shell script that pastes either a provided file or stdin and copies the link to
+       the clipboard (using <a href="https://github.com/astrand/xclip">xclip</a> tool):</p>
+    <div>
+        <pre>#!/usr/bin/env sh
+set -e -u
+WEB="{{prefix}}"
+CLIP_CMD="xclip -selection clipboard -in -rmlastnl"
+
+paste_url=$(curl --silent --upload-file ${1:--} $WEB)
+echo $paste_url | ${CLIP_CMD}
+echo "Paste URL is: $paste_url (copied to clipboard)"</pre>
+    </div>
+    <p>Usage is pretty straightforward:</p>
+    <div>
+        <pre>$ paste.sh /etc/shadow
+$ echo "Lol" | paste.sh
+        </pre>
+    </div>
+
+    <h3>Downloading data</h3>
+    <p>Use any console client you are used to to fetch the data, anything will work just fine:</p>
+    <div><pre>wget -O data.txt {{prefix}}WmDOkGM4MkR-tMWh</pre></div>
+    <p>The service doesn't add or remove anything, so it is perfectly binary safe to upload and
+       download any kind of data.</p>
+
+    <h3>Deleting stuff</h3>
+    <p>It just couldn't be easier, simply send a `DELETE` request to the address:</p>
+    <div><pre>curl -X DELETE {{prefix}}WmDOkGM4MkR-tMWh</pre></div>
+
+    <h2 class="uk-heading-bullet">Browser</h2>
+    <p>While it's super-convenient to always use only the command line interface, sometimes it
+       happens that it's easier to use a browser.</p>
+    <p>The good thing is that I have forseen that unlucky situation and put some effort to build a
+       form to post data, go ahead and use it: <a href="/">upload something already</a>.
+       Actually that's the index page of the service so you won't miss it anyhow.</p>
+    <p>That's all for now, thanks for watching!</p>
+{% endblock content %}

@@ -195,19 +195,15 @@ impl<E> Pastebin<E>
         }
     }
 
-    /// Renders the upload form.
-    fn upload_form(&self) -> IronResult<Response> {
-        self.render_template("upload", &json!({}))
-    }
-
     /// Handles `GET` requests.
     ///
     /// If a URI segment is not provided then the upload form is rendered, otherwise the first
     /// segment is considered to be a paste ID, and hence the paste is fetched from the DB.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
-        match req.url_segment_n(0) {
-            None => self.upload_form(),
-            Some(id) => self.get_paste(&id, req.is_browser()),
+        match req.url_segment_n(0).as_ref().map(String::as_str) {
+            None => self.render_template("upload", &json!({})),
+            Some("readme") => self.render_template("readme", &json!({"prefix": &self.url_prefix})),
+            Some(id) => self.get_paste(id, req.is_browser()),
         }
     }
 

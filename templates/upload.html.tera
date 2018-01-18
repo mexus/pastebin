@@ -1,5 +1,4 @@
 {% extends "base.html.tera" %}
-{% block title %}Upload a paste{% endblock title %}
 {% block head %}
     <script>
         function sendData() {
@@ -17,8 +16,7 @@
             .fail(function(){
                 console.log("Request failed");
                 var alert_message =
-                    $('<p>')
-                        .text("We cannot proceed your request right now, please try again later.");
+                    $('<p>').text("We cannot proceed your request right now, please try again later.");
                 var new_alert = $('<div>')
                     .addClass('uk-alert-danger')
                     .append($('<a class="uk-alert-close" uk-close></a>'))
@@ -33,10 +31,12 @@
         }
     </script>
 {% endblock head %}
+{% block title %}Upload a paste{% endblock title %}
 {% block content %}
     <form>
         <fieldset class="uk-fieldset">
-            <legend id="legend" class="uk-legend">What would you like to share today?</legend>
+            <legend id="legend" class="uk-legend">What would you like to share today?
+                <span class="uk-text-small"><a class="uk-link-text" href="/readme">[By the way, what's this place?]</a></span></legend>
             <div class="uk-margin">
                 <textarea id="paste" class="uk-textarea" rows="15" placeholder="Dear Santa,"></textarea>
             </div>
@@ -45,4 +45,3 @@
         </fieldset>
     </form>
 {% endblock content %}
-
