@@ -154,10 +154,14 @@ impl<E> Pastebin<E>
     }
 
     /// Render a template.
-    fn render_template(&self, name: &str, data: &serde_json::Value) -> IronResult<Response> {
+    fn render_template(&self,
+                       name: &str,
+                       content_type: ContentType,
+                       data: &serde_json::Value)
+                       -> IronResult<Response> {
         let mut response = Response::new();
-        response.headers.set(ContentType::html());
-        response.set_mut(itry!(self.templates.render(&format!("{}.html.tera", name), data,)))
+        response.headers.set(content_type);
+        response.set_mut(itry!(self.templates.render(&format!("{}.tera", name), data,)))
                 .set_mut(status::Ok);
         Ok(response)
     }
@@ -170,7 +174,8 @@ impl<E> Pastebin<E>
                        data: &[u8])
                        -> IronResult<Response> {
         self.render_template(
-            "show",
+            "show.html",
+            ContentType::html(),
             &json!({
                     "id": escape_html(id),
                     "mime": escape_html(mime),
@@ -201,8 +206,13 @@ impl<E> Pastebin<E>
     /// segment is considered to be a paste ID, and hence the paste is fetched from the DB.
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         match req.url_segment_n(0).as_ref().map(String::as_str) {
-            None => self.render_template("upload", &json!({})),
-            Some("readme") => self.render_template("readme", &json!({"prefix": &self.url_prefix})),
+            None => self.render_template("upload.html", ContentType::html(), &json!({})),
+            Some("paste.sh") => self.render_template("paste.sh",
+                                                     ContentType::plaintext(),
+                                                     &json!({"prefix": &self.url_prefix})),
+            Some("readme") => self.render_template("readme.html",
+                                                   ContentType::html(),
+                                                   &json!({"prefix": &self.url_prefix})),
             Some(id) => self.get_paste(id, req.is_browser()),
         }
     }

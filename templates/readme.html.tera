@@ -22,14 +22,7 @@
     <p>Here's a short shell script that pastes either a provided file or stdin and copies the link to
        the clipboard (using <a href="https://github.com/astrand/xclip">xclip</a> tool):</p>
     <div>
-        <pre>#!/usr/bin/env sh
-set -e -u
-WEB="{{prefix}}"
-CLIP_CMD="xclip -selection clipboard -in -rmlastnl"
-
-paste_url=$(curl --silent --upload-file ${1:--} $WEB)
-echo $paste_url | ${CLIP_CMD}
-echo "Paste URL is: $paste_url (copied to clipboard)"</pre>
+        <pre>{% include "paste.sh.tera" %}</pre>
     </div>
     <p>Usage is pretty straightforward:</p>
     <div>
@@ -37,6 +30,8 @@ echo "Paste URL is: $paste_url (copied to clipboard)"</pre>
 $ echo "Lol" | paste.sh
         </pre>
     </div>
+    <p>The script is available for download: <a href="/paste.sh">paste.sh</a>.
+       Don't forget to run chmod on it!</p>
 
     <h3>Downloading data</h3>
     <p>Use any console client you are used to to fetch the data, anything will work just fine:</p>

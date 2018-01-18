@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -e -u
+WEB="{{prefix}}"
+CLIP_CMD="xclip -selection clipboard -in -rmlastnl"
+
+paste_url=$(curl --silent --upload-file ${1:--} $WEB)
+echo $paste_url | ${CLIP_CMD}
+echo "Paste URL is: $paste_url (copied to clipboard)"
