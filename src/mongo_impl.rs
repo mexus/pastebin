@@ -6,6 +6,7 @@ use mongo_driver::{CommandAndFindOptions, MongoError};
 use mongo_driver::client::ClientPool;
 use mongo_driver::collection::{Collection, FindAndModifyOperation};
 use pastebin::{DbInterface, PasteEntry};
+use std::convert::From;
 use std::sync::Arc;
 
 /// A MongoDB wrapper.
@@ -37,27 +38,29 @@ struct DbEntry {
     mime_type: String,
 }
 
-impl DbEntry {
-    /// Convert the entry into a BSON document.
-    fn to_bson(self) -> bson::Document {
+impl From<DbEntry> for bson::Document {
+    fn from(entry: DbEntry) -> bson::Document {
         let mut doc = doc!{
-            "_id": self.id,
-            "data": Bson::Binary(bson::spec::BinarySubtype::Generic, self.data),
-            "mime_type": self.mime_type,
+            "_id": entry.id,
+            "data": Bson::Binary(bson::spec::BinarySubtype::Generic, entry.data),
+            "mime_type": entry.mime_type,
         };
-        if let Some(file_name) = self.file_name {
+        if let Some(file_name) = entry.file_name {
             doc.insert("file_name", file_name);
         }
         doc
     }
+}
 
-    /// Converts the entry into a `PasteEntry`.
-    fn to_paste(self) -> PasteEntry {
-        PasteEntry { data: self.data,
-                     file_name: self.file_name,
-                     mime_type: self.mime_type, }
+impl From<DbEntry> for PasteEntry {
+    fn from(entry: DbEntry) -> PasteEntry {
+        PasteEntry { data: entry.data,
+                     file_name: entry.file_name,
+                     mime_type: entry.mime_type, }
     }
+}
 
+impl DbEntry {
     /// Try to parse a BSON.
     fn from_bson(doc: bson::Document) -> Result<Self, bson::DecoderError> {
         let mut id = None;
@@ -138,7 +141,7 @@ impl DbInterface for MongoDbWrapper {
         collection.insert(&DbEntry { id,
                                      data: data.to_vec(),
                                      file_name,
-                                     mime_type, }.to_bson(),
+                                     mime_type, }.into(),
                           None)
     }
 
@@ -154,7 +157,7 @@ impl DbInterface for MongoDbWrapper {
             Some(entry) => entry,
         };
         let db_entry = DbEntry::from_bson(entry)?;
-        Ok(Some(db_entry.to_paste()))
+        Ok(Some(db_entry.into()))
     }
 
     fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error> {
