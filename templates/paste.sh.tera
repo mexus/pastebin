@@ -1,8 +1,32 @@
 #!/usr/bin/env sh
+
+# A convenience script to upload pastes to a pastebin server. It basically wraps
+# curl and xclip tools, so in order to use the script you are expected to
+# install both `curl` and `xclip`. These tools are very commonly used so you'll
+# find information on how to install them in your distribution easily.
+#
+# Usage is pretty simple and straightforward:
+# $ paste.sh <filename>
+# … to upload a file, and
+# $ echo "Lol" | paste.sh
+# … to upload some plain data.
+#
+# Don't forget to `chmod +x` on the script and put its path to the $PATH
+# variable.
+
 set -e -u
+
+# Web server address.
 WEB="{{prefix}}"
+
+# Command to copy a paste ID to the clipboard (removing the trailing '\n').
 CLIP_CMD="xclip -selection clipboard -in -rmlastnl"
 
+# Sends data to the server.
 paste_url=$(curl --silent --upload-file ${1:--} $WEB)
+
+# Copies the paste link to the clipboard.
 echo $paste_url | ${CLIP_CMD}
+
+# Just for the convenience prints the link.
 echo "Paste URL is: $paste_url (copied to clipboard)"
