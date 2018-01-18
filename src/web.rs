@@ -206,7 +206,14 @@ impl<E> Pastebin<E>
         if is_text(&paste.mime_type) && is_browser {
             self.serve_data_html(id, &paste.mime_type, paste.file_name, &paste.data)
         } else {
-            Ok(Response::with((status::Ok, paste.data)))
+            let mut response = Response::new();
+            let content_type = match paste.mime_type.parse() {
+                Ok(mime) => ContentType(mime),
+                Err(()) => ContentType::plaintext(),
+            };
+            response.headers.set(content_type);
+            response.set_mut((status::Ok, paste.data));
+            Ok(response)
         }
     }
 
