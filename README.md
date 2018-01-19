@@ -71,10 +71,10 @@ deleted (if it exists obviously).
 
 One can utilize the REST api of the service by using some simple command-line
 tools like `curl` or `wget`. A convenience script is provided by the service,
-to download it send a `PUT` or a `POST` request on the `/paste.sh` URL. Or you
-can grab it from the git repo: [paste.sh](templates/paste.sh.tera), but don't
-forget to replace a `{{prefix}}` placeholder with the website http address
-(like `https://example.com`).
+to download it send a `GET` request on the `/paste.sh` URL. Or you can grab it
+from the git repo: [paste.sh](templates/paste.sh.tera), but don't forget to
+replace a `{{prefix}}` placeholder with the website http address (like
+`https://example.com`).
 
 ### Via browser
 
