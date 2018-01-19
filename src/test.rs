@@ -1,14 +1,15 @@
 use DbInterface;
 use ObjectId;
 use PasteEntry;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use data_encoding::BASE64URL_NOPAD;
+use iron;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use web::run_web;
+use web;
 
 #[derive(Clone)]
 struct FakeDb {
@@ -91,19 +92,29 @@ impl DbInterface for FakeDb {
     }
 }
 
+fn remove_milliseconds(dt: DateTime<Utc>) -> DateTime<Utc> {
+    DateTime::from_utc(NaiveDateTime::from_timestamp(dt.timestamp(), 0), Utc)
+}
+
+fn run_web(db: FakeDb, addr: &str, url_prefix: &str) -> iron::Listening {
+    web::run_web(db, addr, Default::default(), url_prefix, Duration::zero()).unwrap()
+}
+
 #[test]
 fn post() {
     const LISTEN_ADDR: &'static str = "127.0.0.1:8000";
-    let connection_addr = &format!("http://{}/", LISTEN_ADDR);
     let reference = PasteEntry { data: b"lol".to_vec(),
                                  file_name: None,
                                  mime_type: "text/plain".into(),
-                                 best_before: None, };
+                                 best_before: Some(remove_milliseconds(Utc::now())), };
+    let connection_addr = &format!("http://{}/?expires={}",
+                                   LISTEN_ADDR,
+                                   reference.best_before.unwrap().timestamp());
     let url_prefix = "prefix://example.com/";
 
     let db = FakeDb::new();
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), url_prefix).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, url_prefix);
 
     let mut response = Client::new().post(connection_addr)
                                     .body(reference.data.clone())
@@ -120,6 +131,7 @@ fn post() {
     assert_eq!(db_entry.data, reference.data);
     assert_eq!(db_entry.file_name, reference.file_name);
     assert_eq!(db_entry.mime_type, reference.mime_type);
+    assert_eq!(db_entry.best_before, reference.best_before);
 }
 
 #[test]
@@ -136,7 +148,7 @@ fn get() {
                 "text/plain".into(),
                 None);
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default());
 
     let mut response = Client::new().get(connection_addr).send().unwrap();
 
@@ -161,10 +173,42 @@ fn remove() {
                 "text/plain".into(),
                 None);
 
-    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default(), Default::default()).unwrap();
+    let mut web = run_web(db.clone(), LISTEN_ADDR, Default::default());
     let response = Client::new().delete(connection_addr).send().unwrap();
     web.close().unwrap();
 
     assert!(response.status().is_success());
     assert!(db.find_data(reference_id).is_none());
+}
+
+#[test]
+fn post_never_expire() {
+    const LISTEN_ADDR: &'static str = "127.0.0.1:8003";
+    let reference = PasteEntry { data: b"lol".to_vec(),
+                                 file_name: None,
+                                 mime_type: "text/plain".into(),
+                                 best_before: None, };
+    let connection_addr = &format!("http://{}/?expires=never", LISTEN_ADDR,);
+    let url_prefix = "prefix://example.com/";
+
+    let db = FakeDb::new();
+
+    let mut web = run_web(db.clone(), LISTEN_ADDR, url_prefix);
+
+    let mut response = Client::new().post(connection_addr)
+                                    .body(reference.data.clone())
+                                    .send()
+                                    .unwrap();
+
+    web.close().unwrap();
+
+    assert!(response.status().is_success());
+    let received_text = response.text().unwrap();
+    assert!(received_text.starts_with(url_prefix));
+    let (_, received_id) = received_text.split_at(url_prefix.len());
+    let db_entry = db.find_data(received_id.trim_right().to_string()).unwrap();
+    assert_eq!(db_entry.data, reference.data);
+    assert_eq!(db_entry.file_name, reference.file_name);
+    assert_eq!(db_entry.mime_type, reference.mime_type);
+    assert_eq!(db_entry.best_before, reference.best_before);
 }

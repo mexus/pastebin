@@ -19,6 +19,17 @@
         <pre>&lt;some command&gt; | curl -F c=@- {{prefix}}</pre>
     </div>
     <p>… to paste an output of an arbitrary command.</p>
+    <p>By default any paste will expire after some time (the default is defined by a
+       server), so if you want your paste to expire at specific time you have to
+       specify it explicitely by passing `expires` argument to the URL with a
+       value of a desired date in the form of a unix timestamp (UTC), or a
+       special value `never` to make the paste to never expire:</p>
+    <div>
+        <pre>&lt;some command&gt; | curl -F c=@- {{prefix}}?expires=never</pre>
+    </div>
+    <div>
+        <pre>&lt;some command&gt; | curl -F c=@- {{prefix}}?expires=1546300800</pre>
+    </div>
     <p>Here's a short shell script that pastes either a provided file or stdin and copies the link to
        the clipboard (using <a href="https://github.com/astrand/xclip">xclip</a> tool):</p>
     <div>

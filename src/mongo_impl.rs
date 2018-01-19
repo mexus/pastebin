@@ -50,6 +50,9 @@ impl From<DbEntry> for bson::Document {
         if let Some(file_name) = entry.file_name {
             doc.insert("file_name", file_name);
         }
+        if let Some(best_before) = entry.best_before {
+            doc.insert("best_before", best_before);
+        }
         doc
     }
 }

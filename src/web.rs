@@ -2,10 +2,13 @@
 //!
 //! See [run_web](fn.run_web.html) documentation for details.
 
+use DateTime;
 use DbInterface;
 use HttpResult;
 use ObjectId;
+use Utc;
 use bson;
+use chrono::{Duration, NaiveDateTime};
 use id;
 use iron::{self, status, Handler, Url};
 use iron::headers::ContentType;
@@ -15,9 +18,11 @@ use iron::prelude::*;
 use mime_guess;
 use serde_json;
 use std::{error, str};
+use std::borrow::Cow;
 use std::convert::From;
 use std::io::{self, Read};
 use std::net::ToSocketAddrs;
+use std::ops::Add;
 use std::path::Path;
 use tera::{self, escape_html, Tera};
 use tree_magic;
@@ -95,6 +100,9 @@ trait RequestExt {
 
     /// Tries to obtain an `n`-th segment of the URI.
     fn url_segment_n(&self, n: usize) -> Option<String>;
+
+    /// Extracts value of an argument (a URI part after `?`).
+    fn get_arg(&self, arg: &str) -> Option<Cow<str>>;
 }
 
 impl<'a, 'b> RequestExt for Request<'a, 'b> {
@@ -123,6 +131,14 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
                           }
                       })
     }
+
+    fn get_arg(&self, arg: &str) -> Option<Cow<str>> {
+        self.url.as_ref()
+            .query_pairs()
+            .find(|&(ref name, _)| name == arg)
+            .map(|(_, value)| value)
+        //.map(|(_, value)| value.to_string())
+    }
 }
 
 fn mime_from_file_name<P: AsRef<str>>(name: P) -> Option<&'static str> {
@@ -137,6 +153,7 @@ struct Pastebin<E> {
     db: Box<DbInterface<Error = E>>,
     templates: Tera,
     url_prefix: String,
+    default_ttl: Duration,
 }
 
 fn is_text(mime: &str) -> bool {
@@ -151,10 +168,15 @@ impl<E> Pastebin<E>
     where E: Send + Sync + error::Error + 'static
 {
     /// Initializes a pastebin web server with a database interface.
-    fn new(db: Box<DbInterface<Error = E>>, templates: Tera, url_prefix: String) -> Self {
+    fn new(db: Box<DbInterface<Error = E>>,
+           templates: Tera,
+           url_prefix: String,
+           default_ttl: Duration)
+           -> Self {
         Pastebin { db,
                    templates,
-                   url_prefix, }
+                   url_prefix,
+                   default_ttl, }
     }
 
     /// Render a template.
@@ -243,9 +265,15 @@ impl<E> Pastebin<E>
                                  .and_then(mime_from_file_name)
                                  .map(Into::into)
                                  .unwrap_or_else(|| tree_magic::from_u8(&data));
+        let expires_at = match req.get_arg("expires") {
+            Some(Cow::Borrowed("never")) => None,
+            Some(x) => {
+                Some(DateTime::from_utc(NaiveDateTime::from_timestamp(itry!(x.parse()), 0), Utc))
+            }
+            _ => Some(Utc::now().add(self.default_ttl)),
+        };
         let id = itry!(bson::oid::ObjectId::new());
-        // FIXME: best before!
-        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type, None));
+        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type, expires_at));
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
@@ -313,6 +341,11 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// forever in its `drop` implementation. For more details have a look at the
 /// `iron::error::HttpResult` documentation.
 ///
+/// # Arguments
+///
+/// * `default_ttl` represents the default expiration time which will be applied if not
+///   `expires` argument for a `POST` request is given.
+///
 /// # Notice
 ///
 /// * No matter how many ending slashes you added to `url_prefix` (even zero), all of them will be
@@ -330,7 +363,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use chrono::{DateTime, Utc};
+/// # use chrono::{DateTime, Duration, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -366,6 +399,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     // ...
 ///     # Default::default(),
 ///     # Default::default(),
+///     # Duration::zero(),
 ///     ).unwrap();
 /// // ... do something ...
 /// web.close(); // Graceful termination.
@@ -383,7 +417,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 /// # use pastebin::{DbInterface, PasteEntry};
 /// # use bson::oid::ObjectId;
 /// # use std::io;
-/// # use chrono::{DateTime, Utc};
+/// # use chrono::{DateTime, Duration, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
@@ -419,6 +453,7 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 ///     // ...
 ///     # Default::default(),
 ///     # Default::default(),
+///     # Duration::zero(),
 ///     ).unwrap();
 /// println!("Ok done"); // <-- will never be reached.
 /// # }
@@ -426,13 +461,14 @@ fn load_data<R: Read>(stream: &mut R, limit: usize) -> Result<Vec<u8>, Error> {
 pub fn run_web<Db, A>(db_wrapper: Db,
                       addr: A,
                       templates: Tera,
-                      url_prefix: &str)
+                      url_prefix: &str,
+                      default_ttl: Duration)
                       -> HttpResult<iron::Listening>
     where Db: DbInterface + 'static,
           A: ToSocketAddrs
 {
     // Make sure there is only one trailing slash.
     let url_prefix = format!("{}/", url_prefix.trim_right_matches('/'));
-    let pastebin = Pastebin::new(Box::new(db_wrapper), templates, url_prefix);
+    let pastebin = Pastebin::new(Box::new(db_wrapper), templates, url_prefix, default_ttl);
     Iron::new(pastebin).http(addr)
 }

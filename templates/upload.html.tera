@@ -1,10 +1,14 @@
 {% extends "base.html.tera" %}
 {% block head %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
+        var date_picker = null;
         function sendData() {
             $('#submit_button').hide();
             $('#spinner').show();
-            $.ajax('/', {
+            const best_before_unix = Math.floor(date_picker.selectedDates[0].getTime() / 1000);
+            $.ajax('/?expires='.concat(best_before_unix), {
                 'data': $('#paste').val(),
                 'type': 'PUT',
                 'timeout': 5000,
@@ -15,9 +19,9 @@
             })
             .fail(function(){
                 console.log("Request failed");
-                var alert_message =
+                const alert_message =
                     $('<p>').text("We cannot proceed your request right now, please try again later.");
-                var new_alert = $('<div>')
+                const new_alert = $('<div>')
                     .addClass('uk-alert-danger')
                     .append($('<a class="uk-alert-close" uk-close></a>'))
                     .append(alert_message);
@@ -29,6 +33,21 @@
                 $('#spinner').hide();
             });
         }
+        $(function() {
+            const now = new Date();
+            console.log(now);
+            var future = new Date(now.valueOf());
+            future.setDate(now.getDate() + 7);
+            console.log(future);
+            date_picker = $("#expires_at").flatpickr({
+                altInput: true,
+                altFormat: "H:i F j, Y",
+                enableTime: true,
+                dateFormat: "Y-m-d H:i",
+                minDate: now,
+                defaultDate: future
+            });
+        });
     </script>
 {% endblock head %}
 {% block title %}Upload a paste{% endblock title %}
@@ -39,6 +58,12 @@
                 <span class="uk-text-small"><a class="uk-link-text" href="/readme">[By the way, what's this place?]</a></span></legend>
             <div class="uk-margin">
                 <textarea id="paste" class="uk-textarea" rows="15" placeholder="Dear Santa,"></textarea>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="expires_at">Best before</label>
+                <div class="uk-form-controls">
+                    <input class="uk-input" type="text" id="expires_at">
+                </div>
             </div>
             <button id="submit_button" class="uk-button uk-button-default" onclick="sendData()" type="button">Submit</button>
             <div id="spinner" uk-spinner style="display: none"></div>

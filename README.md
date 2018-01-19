@@ -48,6 +48,14 @@ To upload data (be it text or a file) simply send it using either a `POST` or a
 like `/file.txt`. The service will reply with a link that contains ID of the
 paste. That address should be used later to manipulate the paste.
 
+To specify an expiry date add a query parameter `expires` to your `POST` request
+with value of a desired expiration date (UTC) in the form of a unix timestamp,
+like the following: `?expires=1546300800` for the 1st of January, 2019 (UTC). If
+you don't specify the date it will be set to the server's defaults (default
+expiration time is passed as a command line argument to the service
+application). In order to make a paste to be stored without a time limit you
+have to pass a special value `never`, like the following: `?expires=never`.
+
 To download data send a `GET` request to `/id`, where `id` is a paste ID
 obtained on the previous step. Actually you don't have to specifically obtain an
 ID, just use the returned link as it is. If the paste has information about its
