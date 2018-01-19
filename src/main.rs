@@ -68,7 +68,8 @@ fn run() -> Result<(), Error> {
                            options.web_addr,
                            templates,
                            &options.url_prefix,
-                           options.default_ttl)?;
+                           options.default_ttl,
+                           options.static_files_path)?;
     unreachable!()
 }
 

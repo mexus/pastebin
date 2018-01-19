@@ -57,6 +57,8 @@ pub struct Options {
     pub url_prefix: String,
     /// Default expiration time for pastes.
     pub default_ttl: Duration,
+    /// Path to the static files.
+    pub static_files_path: String,
 }
 
 /// A helper to simplify a creation of a "no argument" error.
@@ -90,6 +92,8 @@ pub fn parse() -> Result<Options, Error> {
                          .to_string();
     let default_ttl = args.value_of("DEFAULT_TTL").ok_or(no_arg("DEFAULT_TTL"))?
                           .parse()?;
+    let static_files_path = args.value_of("STATIC_PATH").ok_or(no_arg("STATIC_PATH"))?
+                                .to_string();
 
     Ok(Options { db_options: DbOptions { uri,
                                          db_name,
@@ -99,7 +103,8 @@ pub fn parse() -> Result<Options, Error> {
                  templates_path,
                  templates_ext,
                  url_prefix,
-                 default_ttl: Duration::days(default_ttl), })
+                 default_ttl: Duration::days(default_ttl),
+                 static_files_path, })
 }
 
 /// Builds command line arguments.
@@ -154,4 +159,9 @@ fn build_cli() -> clap::App<'static, 'static> {
                                          .takes_value(true)
                                          .default_value("7")
                                          .help("Default pastes expiration time in days"))
+        .arg(Arg::with_name("STATIC_PATH").long("static-path")
+                                         .value_name("path")
+                                         .takes_value(true)
+                                         .required(true)
+                                         .help("Path to the static files"))
 }

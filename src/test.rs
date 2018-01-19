@@ -97,7 +97,12 @@ fn remove_milliseconds(dt: DateTime<Utc>) -> DateTime<Utc> {
 }
 
 fn run_web(db: FakeDb, addr: &str, url_prefix: &str) -> iron::Listening {
-    web::run_web(db, addr, Default::default(), url_prefix, Duration::zero()).unwrap()
+    web::run_web(db,
+                 addr,
+                 Default::default(),
+                 url_prefix,
+                 Duration::zero(),
+                 Default::default()).unwrap()
 }
 
 #[test]

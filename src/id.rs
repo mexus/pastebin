@@ -1,30 +1,8 @@
 //! Help utilities for handling paste IDs.
 
 use ObjectId;
-use bson;
-use data_encoding::{self, BASE64URL_NOPAD};
-
-quick_error!{
-    /// Id conversion error.
-    #[derive(Debug)]
-    pub enum Error {
-        /// ObjectID <-> BSON conversion error.
-        BsonObjId(err: bson::oid::Error) {
-            from()
-            cause(err)
-        }
-        /// ID length error.
-        BsonIdWrongLength(len: usize) {
-            description("Wrong ID length")
-            display("Expected an ID to have length of 12, but it is {}", len)
-        }
-        /// ID decoding error.
-        Decoding(err: data_encoding::DecodeError) {
-            from()
-            cause(err)
-        }
-    }
-}
+use data_encoding::BASE64URL_NOPAD;
+use error::Error;
 
 /// Decodes string into an ObjectID.
 pub fn id_from_string(src: &str) -> Result<ObjectId, Error> {

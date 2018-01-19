@@ -29,7 +29,12 @@ extern crate tree_magic;
 
 pub mod web;
 
+mod error;
 mod id;
+mod mime;
+mod pastebin;
+mod read;
+mod request;
 #[cfg(test)]
 mod test;
 
@@ -38,8 +43,8 @@ extern crate reqwest;
 
 use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
+pub use error::Error;
 use iron::error::HttpResult;
-use std::error;
 
 /// A paste representation. As simple as that.
 #[derive(Debug, Clone)]
@@ -60,7 +65,7 @@ pub struct PasteEntry {
 /// describe them to be abstract enough to be easily used with just any kind of database, be it
 /// SQL, NoSQL or just a hash table or whatever.
 pub trait DbInterface: Send + Sync {
-    type Error: Send + Sync + error::Error + 'static;
+    type Error: Send + Sync + std::error::Error + 'static;
 
     /// Stores the data into the database under a given ID.
     ///
