@@ -37,6 +37,8 @@ pub struct DbOptions {
     pub db_name: String,
     /// Collection name in the database.
     pub collection_name: String,
+    /// Collection of short indices.
+    pub ids_collection_name: String,
 }
 
 #[derive(Debug)]
@@ -81,6 +83,9 @@ pub fn parse() -> Result<Options, Error> {
                       .to_string();
     let collection_name = args.value_of("COLLECTION_NAME").ok_or(no_arg("COLLECTION_NAME"))?
                               .to_string();
+    let ids_collection_name =
+        args.value_of("IDS_COLLECTION_NAME").ok_or(no_arg("IDS_COLLECTION_NAME"))?
+            .to_string();
     let verbose = args.occurrences_of("VERBOSE") as usize;
     let web_addr = args.value_of("WEB_ADDR").ok_or(no_arg("WEB_ADDR"))?
                        .to_string();
@@ -97,7 +102,8 @@ pub fn parse() -> Result<Options, Error> {
 
     Ok(Options { db_options: DbOptions { uri,
                                          db_name,
-                                         collection_name, },
+                                         collection_name,
+                                         ids_collection_name, },
                  web_addr,
                  verbose,
                  templates_path,
@@ -127,6 +133,11 @@ fn build_cli() -> clap::App<'static, 'static> {
                                               .takes_value(true)
                                               .required(true)
                                               .help("Collection name"))
+        .arg(Arg::with_name("IDS_COLLECTION_NAME").long("ids-collection")
+                                              .value_name("name")
+                                              .takes_value(true)
+                                              .required(true)
+                                              .help("IDs collection name"))
         .arg(Arg::with_name("VERBOSE").long("verbose")
                                       .short("v")
                                       .takes_value(false)

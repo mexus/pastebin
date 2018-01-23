@@ -9,9 +9,8 @@
 //! utilized (at least theoretically). The actual code is in the [web](web/index.html) module,
 //! useful examples are also there.
 
-extern crate bson;
+extern crate base64;
 extern crate chrono;
-extern crate data_encoding;
 #[macro_use]
 extern crate iron;
 #[macro_use]
@@ -21,6 +20,7 @@ extern crate log;
 extern crate mime_guess;
 #[macro_use]
 extern crate quick_error;
+extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
@@ -41,7 +41,6 @@ mod test;
 #[cfg(test)]
 extern crate reqwest;
 
-use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
 pub use error::Error;
 use iron::error::HttpResult;
@@ -73,28 +72,31 @@ pub trait DbInterface: Send + Sync {
     /// burden since usually a database will generate an ID for you, but generating it in advance
     /// actually makes you not to rely on a database to return the generated ID. As of MongoDB, the
     /// identifier is generated on the client side anyhow.
+    ///
+    /// # Return value
+    ///
+    /// The function is expected to return a unique (possibly incremental) ID.
     fn store_data(&self,
-                  id: ObjectId,
                   data: &[u8],
                   file_name: Option<String>,
                   mime_type: String,
                   best_before: Option<DateTime<Utc>>)
-                  -> Result<(), Self::Error>;
+                  -> Result<u64, Self::Error>;
 
     /// Loads data from the database.
     ///
     /// Returns a corresponding data if found, `None` otherwise.
-    fn load_data(&self, id: ObjectId) -> Result<Option<PasteEntry>, Self::Error>;
+    fn load_data(&self, id: u64) -> Result<Option<PasteEntry>, Self::Error>;
 
     /// Gets a file name of a paste (if any).
-    fn get_file_name(&self, id: ObjectId) -> Result<Option<String>, Self::Error>;
+    fn get_file_name(&self, id: u64) -> Result<Option<String>, Self::Error>;
 
     /// Removes data from the database.
     ///
     /// Normally we don't care whether an object exists in the database or not, so an
     /// implementation doesn't have to check that fact, and usually databases are okay with
     /// attempts to remove something that doesn't exist.
-    fn remove_data(&self, id: ObjectId) -> Result<(), Self::Error>;
+    fn remove_data(&self, id: u64) -> Result<(), Self::Error>;
 
     /// Tells the maximum data size that could be handled.
     ///

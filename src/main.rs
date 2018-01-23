@@ -61,6 +61,7 @@ fn run() -> Result<(), Error> {
     let mongo_client_pool = ClientPool::new(options.db_options.uri.clone(), None);
     let db_wrapper = MongoDbWrapper::new(options.db_options.db_name,
                                          options.db_options.collection_name,
+                                         options.db_options.ids_collection_name,
                                          mongo_client_pool);
     let templates =
         Tera::new(&format!("{}/**/*{}", options.templates_path, options.templates_ext))?;

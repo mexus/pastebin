@@ -1,9 +1,7 @@
 use DbInterface;
 use Error;
-use ObjectId;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use std::str::from_utf8;
-use id::{id_from_string, id_to_string};
+use id::{decode_id, encode_id};
 use iron::{status, Handler, Url};
 use iron::headers::ContentType;
 use iron::method::Method;
@@ -19,6 +17,7 @@ use std::borrow::Cow;
 use std::fs::File;
 use std::ops::Add;
 use std::path::PathBuf;
+use std::str::from_utf8;
 use tera::{escape_html, Tera};
 
 /// An intermediate structure that handles information about a MongoDB connection and web templates
@@ -36,11 +35,11 @@ impl<E> Pastebin<E>
 {
     /// Initializes a pastebin web server with a database interface.
     pub fn new(db: Box<DbInterface<Error = E>>,
-           templates: Tera,
-           url_prefix: String,
-           default_ttl: Duration,
-           static_path: String)
-           -> Self {
+               templates: Tera,
+               url_prefix: String,
+               default_ttl: Duration,
+               static_path: String)
+               -> Self {
         Pastebin { db,
                    templates,
                    url_prefix,
@@ -63,7 +62,7 @@ impl<E> Pastebin<E>
 
     /// Serves data in a form of HTML.
     fn serve_data_html(&self,
-                       id: &str,
+                       id: u64,
                        mime: &str,
                        file_name: Option<String>,
                        data: &[u8])
@@ -72,7 +71,7 @@ impl<E> Pastebin<E>
             "show.html",
             ContentType::html(),
             &json!({
-                    "id": escape_html(id),
+                    "id": id,
                     "mime": escape_html(mime),
                     "file_name": file_name.map(|s| escape_html(&s)),
                     "data": escape_html(itry!(from_utf8(data)))
@@ -81,19 +80,21 @@ impl<E> Pastebin<E>
     }
 
     /// Loads a paste from the database.
-    fn get_paste(&self, id: &str, is_browser: bool, name_provided: bool) -> IronResult<Response> {
-        debug!("Id: '{}'", id);
-        let object_id = itry!(id_from_string(id));
+    fn get_paste(&self,
+                 str_id: &str,
+                 is_browser: bool,
+                 name_provided: bool)
+                 -> IronResult<Response> {
+        let id = itry!(decode_id(str_id));
         if !name_provided {
-            if let Some(name) = itry!(self.db.get_file_name(object_id.clone())) {
+            if let Some(name) = itry!(self.db.get_file_name(id)) {
                 let new_url =
-                    Url::parse(&format!("{}{}/{}", self.url_prefix, id, name))
+                    Url::parse(&format!("{}{}/{}", self.url_prefix, str_id, name))
                         .map_err(|e| Error::Url(e))?;
                 return Ok(Response::with((status::MovedPermanently, Redirect(new_url))));
             }
         }
-        let paste =
-            itry!(self.db.load_data(object_id.clone())).ok_or(Error::IdNotFound(object_id))?;
+        let paste = itry!(self.db.load_data(id)).ok_or(Error::IdNotFound(id))?;
         if mime::is_text(&paste.mime_type) && is_browser {
             self.serve_data_html(id, &paste.mime_type, paste.file_name, &paste.data)
         } else {
@@ -121,16 +122,12 @@ impl<E> Pastebin<E>
     fn get(&self, req: &mut Request) -> IronResult<Response> {
         match req.url_segment_n(0) {
             None => self.render_template("upload.html", ContentType::html(), &json!({})),
-            Some("paste.sh") => {
-                self.render_template("paste.sh",
-                                     ContentType::plaintext(),
-                                     &json!({"prefix": &self.url_prefix}))
-            }
-            Some("readme") => {
-                self.render_template("readme.html",
-                                     ContentType::html(),
-                                     &json!({"prefix": &self.url_prefix}))
-            }
+            Some("paste.sh") => self.render_template("paste.sh",
+                                                     ContentType::plaintext(),
+                                                     &json!({"prefix": &self.url_prefix})),
+            Some("readme") => self.render_template("readme.html",
+                                                   ContentType::html(),
+                                                   &json!({"prefix": &self.url_prefix})),
             Some(file_name) if self.static_path.join(file_name).is_file() => {
                 self.serve_static(file_name)
             }
@@ -151,17 +148,17 @@ impl<E> Pastebin<E>
             }
             _ => Some(Utc::now().add(self.default_ttl)),
         };
-        let id = itry!(ObjectId::new());
-        itry!(self.db.store_data(id.clone(), &data, file_name, mime_type, expires_at));
+        let id = itry!(self.db.store_data(&data, file_name, mime_type, expires_at));
+        debug!("Generated id: {}", id);
         Ok(Response::with((status::Ok,
                           format!("{}{}\n",
                                    self.url_prefix,
-                                   id_to_string(id)))))
+                                   encode_id(id)))))
     }
 
     /// Handles `DELETE` requests.
     fn remove(&self, req: &mut Request) -> IronResult<Response> {
-        let id = itry!(id_from_string(&req.url_segment_n(0).ok_or(Error::NoIdSegment)?));
+        let id = itry!(decode_id(&req.url_segment_n(0).ok_or(Error::NoIdSegment)?));
         itry!(self.db.remove_data(id));
         Ok(Response::with(status::Ok))
     }

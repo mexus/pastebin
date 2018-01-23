@@ -43,28 +43,26 @@ use tera::Tera;
 /// # extern crate bson;
 /// # extern crate chrono;
 /// # use pastebin::{DbInterface, PasteEntry};
-/// # use bson::oid::ObjectId;
 /// # use std::io;
 /// # use chrono::{DateTime, Duration, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
 ///   # fn store_data(&self,
-///   #               _id: ObjectId,
 ///   #               _data: &[u8],
 ///   #               _file_name: Option<String>,
 ///   #               _mime_type: String,
 ///   #               _best_before: Option<DateTime<Utc>>)
-///   #               -> Result<(), Self::Error> {
+///   #               -> Result<u64, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
+///   # fn load_data(&self, _: u64) -> Result<Option<PasteEntry>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {
+///   # fn get_file_name(&self, _: u64) -> Result<Option<String>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: u64) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {
@@ -98,28 +96,26 @@ use tera::Tera;
 /// # extern crate bson;
 /// # extern crate chrono;
 /// # use pastebin::{DbInterface, PasteEntry};
-/// # use bson::oid::ObjectId;
 /// # use std::io;
 /// # use chrono::{DateTime, Duration, Utc};
 /// # struct DbImplementation;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
 ///   # fn store_data(&self,
-///   #               _id: ObjectId,
 ///   #               _data: &[u8],
 ///   #               _file_name: Option<String>,
 ///   #               _mime_type: String,
 ///   #               _best_before: Option<DateTime<Utc>>)
-///   #               -> Result<(), Self::Error> {
+///   #               -> Result<u64, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn load_data(&self, _: ObjectId) -> Result<Option<PasteEntry>, Self::Error> {
+///   # fn load_data(&self, _: u64) -> Result<Option<PasteEntry>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn get_file_name(&self, _: ObjectId) -> Result<Option<String>, Self::Error> {
+///   # fn get_file_name(&self, _: u64) -> Result<Option<String>, Self::Error> {
 ///   #   unimplemented!()
 ///   # }
-///   # fn remove_data(&self, _: ObjectId) -> Result<(), Self::Error> {
+///   # fn remove_data(&self, _: u64) -> Result<(), Self::Error> {
 ///   #   unimplemented!()
 ///   # }
 ///   # fn max_data_size(&self) -> usize {

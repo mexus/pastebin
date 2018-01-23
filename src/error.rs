@@ -1,12 +1,9 @@
 //! Library erros.
 
-use bson;
-use bson::oid::ObjectId;
-use data_encoding;
+use base64;
 use iron::IronError;
 use iron::status;
 use std::io;
-use std::str::Utf8Error;
 use tera;
 
 quick_error!{
@@ -22,32 +19,17 @@ quick_error!{
         TooBig {
             description("Too large paste")
         }
-        /// ID decoding error.
-        Decoding(err: data_encoding::DecodeError) {
-            from()
-            cause(err)
-        }
-        /// ObjectID conversion error.
-        BsonObjId(err: bson::oid::Error) {
-            from()
-            cause(err)
-        }
-        /// ID length error.
-        BsonIdWrongLength(len: usize) {
-            description("Wrong ID length")
-            display("Expected an ID to have length of 12, but it is {}", len)
-        }
         /// Malformed URI (no ID).
         NoIdSegment {
             description("ID segment not found in the URL")
         }
         /// Unknown ID.
-        IdNotFound(id: ObjectId) {
+        IdNotFound(id: u64) {
             description("ID not found")
             display("Id {} not found", id)
         }
-        /// UTF8 conversion error.
-        Utf8(err: Utf8Error) {
+        /// ID decoder error.
+        IdDecode(err: base64::DecodeError) {
             from()
             cause(err)
         }
