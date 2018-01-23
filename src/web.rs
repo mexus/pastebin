@@ -49,7 +49,7 @@ use tera::Tera;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
 ///   # fn store_data(&self,
-///   #               _data: &[u8],
+///   #               _data: Vec<u8>,
 ///   #               _file_name: Option<String>,
 ///   #               _mime_type: String,
 ///   #               _best_before: Option<DateTime<Utc>>)
@@ -102,7 +102,7 @@ use tera::Tera;
 /// # impl DbInterface for DbImplementation {
 ///   # type Error = io::Error;
 ///   # fn store_data(&self,
-///   #               _data: &[u8],
+///   #               _data: Vec<u8>,
 ///   #               _file_name: Option<String>,
 ///   #               _mime_type: String,
 ///   #               _best_before: Option<DateTime<Utc>>)

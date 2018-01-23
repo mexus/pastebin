@@ -174,7 +174,7 @@ impl DbInterface for MongoDbWrapper {
     type Error = MongoError;
 
     fn store_data(&self,
-                  data: &[u8],
+                  data: Vec<u8>,
                   file_name: Option<String>,
                   mime_type: String,
                   best_before: Option<DateTime<Utc>>)
@@ -183,7 +183,7 @@ impl DbInterface for MongoDbWrapper {
         let id = self.get_new_id(&db)?;
         let collection = db.get_collection(self.collection_name.clone());
         collection.insert(&DbEntry { id,
-                                      data: data.to_vec(),
+                                      data: data,
                                       file_name,
                                       mime_type,
                                       best_before, }.into(),

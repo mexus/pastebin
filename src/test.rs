@@ -63,12 +63,12 @@ impl DbInterface for FakeDb {
     type Error = FakeError;
 
     fn store_data(&self,
-                  data: &[u8],
+                  data: Vec<u8>,
                   file_name: Option<String>,
                   mime: String,
                   expires_at: Option<DateTime<Utc>>)
                   -> Result<u64, Self::Error> {
-        let id = self.put_data(data.to_vec(), file_name, mime, expires_at);
+        let id = self.put_data(data, file_name, mime, expires_at);
         Ok(id)
     }
 

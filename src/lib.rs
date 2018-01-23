@@ -77,7 +77,7 @@ pub trait DbInterface: Send + Sync {
     ///
     /// The function is expected to return a unique (possibly incremental) ID.
     fn store_data(&self,
-                  data: &[u8],
+                  data: Vec<u8>,
                   file_name: Option<String>,
                   mime_type: String,
                   best_before: Option<DateTime<Utc>>)

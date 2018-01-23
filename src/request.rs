@@ -9,6 +9,9 @@ pub trait RequestExt {
     /// (like wget or curl).
     fn is_browser(&self) -> bool;
 
+    /// Retrieves data from the `ContentLength` header if it is provided.
+    fn get_length(&self) -> Option<u64>;
+
     /// Tries to obtain an `n`-th segment of the URI.
     fn url_segment_n(&self, n: usize) -> Option<&str>;
 
@@ -28,6 +31,15 @@ impl<'a, 'b> RequestExt for Request<'a, 'b> {
                      BROWSERS.iter().any(|browser| agent.contains(browser))
                  })
             .unwrap_or(false)
+    }
+
+    fn get_length(&self) -> Option<u64> {
+        self.headers.get::<iron::headers::ContentLength>()
+            .map(|length_header| {
+                     let length = length_header.0;
+                     debug!("Content length: {}", length);
+                     length
+                 })
     }
 
     fn url_segment_n(&self, n: usize) -> Option<&str> {
