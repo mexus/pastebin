@@ -151,7 +151,7 @@ impl<E> Pastebin<E>
         };
         let id = itry!(self.db.store_data(data, file_name, mime_type, expires_at));
         debug!("Generated id: {}", id);
-        Ok(Response::with((status::Ok,
+        Ok(Response::with((status::Created,
                           format!("{}{}\n",
                                    self.url_prefix,
                                    encode_id(id)))))
