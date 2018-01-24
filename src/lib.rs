@@ -63,19 +63,29 @@ pub struct PasteEntry {
 /// To store and retrieve pastes from a database we only need several functions. And we can
 /// describe them to be abstract enough to be easily used with just any kind of database, be it
 /// SQL, NoSQL or just a hash table or whatever.
+///
+/// # Thread safety
+///
+/// This trait is required to be thread safe (`Send + Sync`) since it will be used from multiple
+/// threads.
+///
+/// # Errors handling
+///
+/// An implementation must provide an `Error` type, which must be thread safe as well and also
+/// have a `'static` lifetime.
+///
+/// Should some method return an error it will be logged by the web server, but will not be send to
+/// an http client, it will just receive an internal server error:
+/// [500](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500).
 pub trait DbInterface: Send + Sync {
     type Error: Send + Sync + std::error::Error + 'static;
 
-    /// Stores the data into the database under a given ID.
-    ///
-    /// Unique ID has to be generated before calling this method. It might be found to be an extra
-    /// burden since usually a database will generate an ID for you, but generating it in advance
-    /// actually makes you not to rely on a database to return the generated ID. As of MongoDB, the
-    /// identifier is generated on the client side anyhow.
+    /// Stores the data into the database and returns a unique ID that should be used later to
+    /// access the data.
     ///
     /// # Return value
     ///
-    /// The function is expected to return a unique (possibly incremental) ID.
+    /// The function is expected to return a unique ID.
     fn store_data(&self,
                   data: Vec<u8>,
                   file_name: Option<String>,
@@ -85,7 +95,7 @@ pub trait DbInterface: Send + Sync {
 
     /// Loads data from the database.
     ///
-    /// Returns a corresponding data if found, `None` otherwise.
+    /// Returns corresponding data if found, `None` otherwise.
     fn load_data(&self, id: u64) -> Result<Option<PasteEntry>, Self::Error>;
 
     /// Gets a file name of a paste (if any).
@@ -98,7 +108,7 @@ pub trait DbInterface: Send + Sync {
     /// attempts to remove something that doesn't exist.
     fn remove_data(&self, id: u64) -> Result<(), Self::Error>;
 
-    /// Tells the maximum data size that could be handled.
+    /// Returns the maximum data size that could be handled.
     ///
     /// This is useful, for example, for MongoDB which has a limit on a BSON document size.
     fn max_data_size(&self) -> usize;

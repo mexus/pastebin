@@ -14,7 +14,7 @@ use tera::Tera;
 /// Runs a web server.
 ///
 /// This is the main function of the library. Starts a web server and serves the
-/// following HTTP requests: `GET`, `POST` and `DELETE`.
+/// following HTTP requests: `GET`, `POST`, `PUT` and `DELETE`.
 ///
 /// Basically it is just a layer between an `Iron` web server and a `DbInterface` implementation.
 ///
@@ -25,13 +25,59 @@ use tera::Tera;
 ///
 /// # Arguments
 ///
-/// * `default_ttl` represents the default expiration time which will be applied if not
-///   `expires` argument for a `POST` request is given.
+/// * `db_wrapper` is a layer that provides an access to your favourite database. Must implement
+/// `DbInterface` and have a `'static` lifetime.
+///
+/// * `addr` is a local address which the webserver will use. Rust provides a very nice way to
+/// handle it, please go ahead and read docs regarding the `ToSocketAddrs` trait, but if you need a
+/// fast solution just pass a string like `"0.0.0.0:8000"` to make the server to listen to incoming
+/// requests on port 8000 on all the available network interfaces.
+///
+/// * `templates` is an instance of the [Tera](https://github.com/Keats/tera) template engine.
+/// Please refer to the following section to learn the requirements.
+///
+/// * `url_prefix` used for responding to `POST`/`PUT` requests: if a paste has been successfully
+/// inserted into the database the server will reply with the following string: `${addr}id` (please
+/// mind that `addr` will always end with a slash `/`), where `${addr}` is that url prefix (with a
+/// slash…). So you probably want to put an external address of your paste service instance ;-).
+///
+/// * `default_ttl` represents the default expiration time which will be applied if not `expires`
+/// argument for a `POST`/`PUT` request is given.
+///
+/// * `static_files_path` is a path relative to the working path (i.e. the path where you have
+/// launched the service). As the name suggests it will be used to server static files that reside
+/// in that directory. As for now, *sub-directories are not supported*, that is you can't serve
+/// files that reside not directly at the path. To access a static file use a `GET` request on the
+/// address `/<file-name>`, very simple and straightforward.
+///
+/// # Templates
+///
+/// The service uses `Tera` templates to build web pages, so it expects the engine to serve the
+/// following files:
+///
+/// * `show.html.tera`: expects `id` (a paste id), `mime` (mime-type string), `file_name` (`null`
+/// if there is no file name associated with the paste), and `data` which is actually the paste
+/// itself.
+/// * `upload.html.tera`: no parameters.
+/// * `paste.sh.tera`: expects `prefix`, see `url_prefix` argument.
+/// * `readme.html.tera`: also expects `prefix`.
+///
+/// All these files are provided with the service (`/templates/`).
 ///
 /// # Notice
 ///
-/// * No matter how many ending slashes you added to `url_prefix` (even zero), all of them will be
-///   removed and one slash will be added.
+/// No matter how many ending slashes (`/`) you add to `url_prefix` (even zero), all of them will be
+/// removed and one slash will be added. If for some reason you need two (or more) ending slashes
+/// feel free to post an issue on github, because this is basically a hack and could be (and
+/// probably should be) properly fixed.
+///
+/// # `PUT` vs `POST`
+///
+/// While [REST](https://en.wikipedia.org/wiki/Representational_state_transfer) differentiates
+/// between those two request kinds, there is no difference in this service. Why? Well, just
+/// because some CLI clients tend to use `POST` requests by default for sending data and some use
+/// `PUT`, so that's why the service do not care. If you have any argument why this shouldn't be
+/// the case please fill free to post an issue on github.
 ///
 /// # Example
 ///

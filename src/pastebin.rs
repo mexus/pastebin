@@ -135,7 +135,7 @@ impl<E> Pastebin<E>
         }
     }
 
-    /// Handles `POST` requests.
+    /// Handles `POST` and `PUT` requests.
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let file_name = req.url_segment_n(0).map(|s| s.to_string());
         debug!("File name: {:?}", file_name);

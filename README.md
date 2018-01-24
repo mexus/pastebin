@@ -48,21 +48,25 @@ To upload data (be it text or a file) simply send it using either a `POST` or a
 like `/file.txt`. The service will reply with a link that contains ID of the
 paste. That address should be used later to manipulate the paste.
 
-To specify an expiry date add a query parameter `expires` to your `POST` request
-with value of a desired expiration date (UTC) in the form of a unix timestamp,
-like the following: `?expires=1546300800` for the 1st of January, 2019 (UTC). If
-you don't specify the date it will be set to the server's defaults (default
-expiration time is passed as a command line argument to the service
-application). In order to make a paste to be stored without a time limit you
-have to pass a special value `never`, like the following: `?expires=never`.
+To specify an expiry date add a query parameter `expires` to your `POST`
+(`PUT`) request with value of a desired expiration date (UTC) in the form of a
+unix timestamp, like the following: `?expires=1546300800` for the 1st of
+January, 2019 (UTC). If you don't specify the date it will be set to the
+server's defaults (default expiration time is passed as a command line argument
+to the service application). In order to make a paste to be stored without a
+time limit you have to pass a special value `never`, like the following:
+`?expires=never`.
 
 To download data send a `GET` request to `/id`, where `id` is a paste ID
-obtained on the previous step. Actually you don't have to specifically obtain an
-ID, just use the returned link as it is. If the paste has information about its
-file name the service will redirect the request to `/id/file-name` so you'll be
-able to save the file under the correct name.
+obtained on the previous step. Actually it's not like you don't have to
+specifically obtain an ID, just use the returned link from the `POST` (`PUT`)
+as it is. If the paste has information about its file name the service will
+redirect the request to `/id/file-name` so you'll be able to save the file
+under the correct name. By the way, if you want to take advantage of this
+feature while using `wget` pass `--content-disposition` flag to your command.
 
-You can optionally provide a desired file name like `/id/file-name`.
+You can also optionally provide a desired file name like `/id/file-name` to
+your `GET` request.
 
 To delete a paste send a `DELETE` request to `/id`, and the paste will be
 deleted (if it exists obviously).
@@ -83,11 +87,16 @@ especially a binary one, I would advise to use a CLI file uploader.
 
 A *readme* page is available at `/readme` (there's also a link on the `/` page).
 
+By the way, `GET` requests are handled differently for browsers and command
+line clients (detected by
+[user-agent](https://en.wikipedia.org/wiki/User_agent)): if you ask for a paste
+from your command line the paste will be provided as-it-is, i.e. its binary
+representation, while a nice page will be rendered for text-like pastes if you
+access the page from your browser.
+
 ## Performance
 
-I've run a simple performance test on my maching and the service is able to
-accept about 6500 post requests per second for 10 KB samples and about 3000
-posts requests per seconds for 100 KB samples.
+To be done.
 
 ## Limitations
 
