@@ -43,6 +43,10 @@ quick_error!{
             description("Can't parse URL")
             display("Can't parse URL: {}", err)
         }
+        /// We expect a `ContentLength` header for incoming requests.
+        NoContentLength {
+            description("No content-length header provided")
+        }
     }
 }
 

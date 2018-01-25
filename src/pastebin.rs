@@ -139,8 +139,11 @@ impl<E> Pastebin<E>
     fn post(&self, req: &mut Request) -> IronResult<Response> {
         let file_name = req.url_segment_n(0).map(|s| s.to_string());
         debug!("File name: {:?}", file_name);
-        let data_length = req.get_length();
-        let data = load_data(&mut req.body, self.db.max_data_size(), data_length)?;
+        let data_length = req.get_length().ok_or(Error::NoContentLength)?;
+        if data_length > self.db.max_data_size() as u64 {
+            return Err(Error::TooBig.into());
+        }
+        let data = load_data(&mut req.body, data_length)?;
         let mime_type = mime::data_mime_type(file_name.as_ref(), &data);
         let expires_at = match req.get_arg("expires") {
             Some(Cow::Borrowed("never")) => None,
