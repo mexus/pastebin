@@ -5,17 +5,7 @@
       href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github-gist.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/rust.min.js"></script>
-    <script>
-        $(document).ready(function(){
-            var code_container = $('pre');
-            var worker = new Worker('hljs_worker.js');
-            worker.onmessage = function(event) {
-                code_container.html(event.data.value);
-                $('#contents_type').text(event.data.language);
-            }
-            worker.postMessage(code_container.text());
-        })
-    </script>
+    <script src="../show.js"></script>
     <link
       rel="stylesheet"
       href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/css/bootstrap.min.css"
@@ -24,11 +14,24 @@
 {% endblock head %}
 {% block title %} {% if file_name %}{{file_name}}{% else %}{{id}}{% endif %}{% endblock title %}
 {% block content %}
-    <span title="MIME type" uk-tooltip class="uk-label uk-label-success">{{mime}}</span>
-    <span id="contents_type" title="Contents type" uk-tooltip class="uk-label"></span>
-    {% if file_name %}
-    <p><span title="File name" uk-tooltip class="uk-label uk-label-warning">{{file_name}}</span></p>
-    {% endif %}
+    <p>
+        <span title="MIME type" uk-tooltip class="uk-label uk-label-success">{{mime}}</span>
+        {% if file_name %}
+        <span title="File name" uk-tooltip class="uk-label uk-label-warning">{{file_name}}</span>
+        {% endif %}
+        <span id="contents_type_label" title="Highlighted language" uk-tooltip class="uk-label uk-label"></span>
+    </p>
+    <div class="uk-width-1-5">
+        <input
+            id="contents_type"
+            title="Contents type"
+            class="uk-input"
+            list="supported_languages"
+            autocomplete="off"
+            uk-tooltip="pos: bottom-left"
+        />
+        <datalist id="supported_languages"></datalist>
+    </div>
     <div class="uk-margin">
         <pre style="padding-top: 1em"><code>{{data}}</code></pre>
     </div>

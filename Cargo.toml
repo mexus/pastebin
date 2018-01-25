@@ -1,6 +1,6 @@
 [package]
 name = "pastebin"
-version = "0.17.5"
+version = "0.17.6"
 authors = ["mexus <gilaldpellaeon@gmail.com>"]
 description = "A simple pastebin service"
 license = "GPL-3.0"
