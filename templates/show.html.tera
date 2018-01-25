@@ -7,10 +7,13 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/rust.min.js"></script>
     <script>
         $(document).ready(function(){
-            res = hljs.highlightAuto($('pre').text());
-            $('#contents_type').text(res.language);
-            $('pre').html(res.value)
-            console.log(res)
+            var code_container = $('pre');
+            var worker = new Worker('hljs_worker.js');
+            worker.onmessage = function(event) {
+                code_container.html(event.data.value);
+                $('#contents_type').text(event.data.language);
+            }
+            worker.postMessage(code_container.text());
         })
     </script>
     <link
