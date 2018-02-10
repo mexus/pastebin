@@ -78,26 +78,27 @@ fn parse_uri(arg: &str) -> Result<MongoUri, Error> {
 /// Parses command line arguments.
 pub fn parse() -> Result<Options, Error> {
     let args = build_cli().get_matches();
-    let uri = parse_uri(args.value_of("DB_URI").ok_or(no_arg("DB_URI"))?)?;
-    let db_name = args.value_of("DB_NAME").ok_or(no_arg("DB_NAME"))?
+    let uri = parse_uri(args.value_of("DB_URI").ok_or_else(|| no_arg("DB_URI"))?)?;
+    let db_name = args.value_of("DB_NAME").ok_or_else(|| no_arg("DB_NAME"))?
                       .to_string();
-    let collection_name = args.value_of("COLLECTION_NAME").ok_or(no_arg("COLLECTION_NAME"))?
-                              .to_string();
+    let collection_name =
+        args.value_of("COLLECTION_NAME").ok_or_else(|| no_arg("COLLECTION_NAME"))?
+            .to_string();
     let ids_collection_name =
-        args.value_of("IDS_COLLECTION_NAME").ok_or(no_arg("IDS_COLLECTION_NAME"))?
+        args.value_of("IDS_COLLECTION_NAME").ok_or_else(|| no_arg("IDS_COLLECTION_NAME"))?
             .to_string();
     let verbose = args.occurrences_of("VERBOSE") as usize;
-    let web_addr = args.value_of("WEB_ADDR").ok_or(no_arg("WEB_ADDR"))?
+    let web_addr = args.value_of("WEB_ADDR").ok_or_else(|| no_arg("WEB_ADDR"))?
                        .to_string();
-    let templates_path = args.value_of("TEMPLATES_PATH").ok_or(no_arg("TEMPLATES_PATH"))?
+    let templates_path = args.value_of("TEMPLATES_PATH").ok_or_else(|| no_arg("TEMPLATES_PATH"))?
                              .to_string();
-    let templates_ext = args.value_of("TEMPLATES_EXT").ok_or(no_arg("TEMPLATES_EXT"))?
+    let templates_ext = args.value_of("TEMPLATES_EXT").ok_or_else(|| no_arg("TEMPLATES_EXT"))?
                             .to_string();
-    let url_prefix = args.value_of("URL_PREFIX").ok_or(no_arg("URL_PREFIX"))?
+    let url_prefix = args.value_of("URL_PREFIX").ok_or_else(|| no_arg("URL_PREFIX"))?
                          .to_string();
-    let default_ttl = args.value_of("DEFAULT_TTL").ok_or(no_arg("DEFAULT_TTL"))?
+    let default_ttl = args.value_of("DEFAULT_TTL").ok_or_else(|| no_arg("DEFAULT_TTL"))?
                           .parse()?;
-    let static_files_path = args.value_of("STATIC_PATH").ok_or(no_arg("STATIC_PATH"))?
+    let static_files_path = args.value_of("STATIC_PATH").ok_or_else(|| no_arg("STATIC_PATH"))?
                                 .to_string();
 
     Ok(Options { db_options: DbOptions { uri,

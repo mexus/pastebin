@@ -1,4 +1,4 @@
-//! MongoDB wrapper that implements `DbInterface`.
+//! `MongoDB` wrapper that implements `DbInterface`.
 
 use bson::{self, Bson};
 use chrono::{DateTime, Utc};
@@ -10,7 +10,7 @@ use pastebin::{DbInterface, PasteEntry};
 use std::convert::From;
 use std::sync::Arc;
 
-/// A MongoDB wrapper.
+/// A `MongoDB` wrapper.
 pub struct MongoDbWrapper {
     db_name: String,
     collection_name: String,

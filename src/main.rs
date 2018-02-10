@@ -27,7 +27,7 @@ quick_error! {
             cause(err)
             from()
         }
-        Mongo(err: MongoError) {
+        Mongo(err: Box<MongoError>) {
             cause(err)
             from()
         }
