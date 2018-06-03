@@ -1,5 +1,4 @@
-[![crates.io](https://img.shields.io/crates/v/pastebin.svg)](https://crates.io/crates/pastebin)
-[![docs.rs](https://docs.rs/pastebin/badge.svg)](https://docs.rs/pastebin)
+[![crates.io](https://img.shields.io/crates/v/pastebind.svg)](https://crates.io/crates/pastebind)
 [![travis-ci](https://travis-ci.org/mexus/pastebin.svg?branch=master)](https://travis-ci.org/mexus/pastebin)
 
 # Simple pastebin server
@@ -14,11 +13,14 @@ highlighting.
 
 ## Running the service
 
-Build (`cargo build` or `cargo build --release`) or install the library (`cargo
-install pastebin`). Then simply launch the executable (there's just one
+Please note! This library crate provides only a library (obviously), and the
+real server is decoupled into a separate crate `pastebind`.
+
+Build (`cargo build` or `cargo build --release`) or install the binary (`cargo
+install pastebind`). Then simply launch the executable (there's just one
 executable generated) with `--help` flag to see the options. Basically you have
 to specify mongodb connection options, path to the `html` (ans `sh`) templates
-(`templates` folder in the repo) and server external address.
+(`templates` folder in the server's repo) and server external address.
 
 Currently a clean exit is not supported, so just kill the process when you want
 to stop it.

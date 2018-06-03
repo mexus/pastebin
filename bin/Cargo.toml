@@ -1,0 +1,25 @@
+[package]
+name = "pastebind"
+version = "0.1.0"
+authors = ["mexus <gilaldpellaeon@gmail.com>"]
+description = "A simple pastebin server"
+license = "GPL-3.0"
+readme = "README.md"
+keywords = ["pastebin"]
+repository = "https://github.com/mexus/pastebin"
+
+[badges]
+maintenance = { status = "actively-developed" }
+travis-ci = { repository = "mexus/pastebin", branch = "master" }
+
+[dependencies]
+bson = "0.11"
+chrono = "0.4"
+clap = "2.29"
+iron = "0.6"
+log = "0.4"
+mongo_driver = "0.12"
+pastebin = "0.17"
+quick-error = "1.2"
+simplelog = "0.5"
+tera = "0.11"
