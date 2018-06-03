@@ -1,7 +1,7 @@
+# Simple pastebin server
+
 [![crates.io](https://img.shields.io/crates/v/pastebind.svg)](https://crates.io/crates/pastebind)
 [![travis-ci](https://travis-ci.org/mexus/pastebin.svg?branch=master)](https://travis-ci.org/mexus/pastebin)
-
-# Simple pastebin server
 
 ## About
 
@@ -10,6 +10,9 @@ A simple multipurpose RESTful storage server written in
 as a storage backend, [Iron](https://github.com/iron/iron) web framework to do
 the web stuff and [highlight.js](https://highlightjs.org/) to do synax
 highlighting.
+
+This server is wrapping up a [`pastebin`](https://crates.io/crates/pastebin)
+library.
 
 ## Running the service
 

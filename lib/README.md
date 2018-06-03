@@ -1,8 +1,12 @@
+# Simple pastebin service
+
 [![crates.io](https://img.shields.io/crates/v/pastebin.svg)](https://crates.io/crates/pastebin)
 [![docs.rs](https://docs.rs/pastebin/badge.svg)](https://docs.rs/pastebin)
 [![travis-ci](https://travis-ci.org/mexus/pastebin.svg?branch=master)](https://travis-ci.org/mexus/pastebin)
 
-# Simple pastebin service
+[[Release docs]](https://docs.rs/pastebin/)
+
+[[Master docs]](https://mexus.gitlab.io/pastebin/pastebin/)
 
 ## About
 
