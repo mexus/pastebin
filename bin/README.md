@@ -13,9 +13,6 @@ highlighting.
 
 ## Running the service
 
-Please note! This library crate provides only a library (obviously), and the
-real server is decoupled into a separate crate `pastebind`.
-
 Build (`cargo build` or `cargo build --release`) or install the binary (`cargo
 install pastebind`). Then simply launch the executable (there's just one
 executable generated) with `--help` flag to see the options. Basically you have
