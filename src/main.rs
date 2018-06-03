@@ -45,11 +45,11 @@ quick_error! {
 fn init_logs(verbose: usize) -> Result<(), Error> {
     // Set up the logging depending on how many times a '-v' option has been used.
     let verbosity = match verbose {
-        1 => simplelog::LogLevelFilter::Warn,
-        2 => simplelog::LogLevelFilter::Info,
-        3 => simplelog::LogLevelFilter::Debug,
-        4 => simplelog::LogLevelFilter::Trace,
-        _ => simplelog::LogLevelFilter::Error,
+        1 => simplelog::LevelFilter::Warn,
+        2 => simplelog::LevelFilter::Info,
+        3 => simplelog::LevelFilter::Debug,
+        4 => simplelog::LevelFilter::Trace,
+        _ => simplelog::LevelFilter::Error,
     };
     simplelog::SimpleLogger::init(verbosity, Default::default()).unwrap();
     Ok(())

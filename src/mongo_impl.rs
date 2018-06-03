@@ -183,7 +183,7 @@ impl DbInterface for MongoDbWrapper {
         let id = self.get_new_id(&db)?;
         let collection = db.get_collection(self.collection_name.clone());
         collection.insert(&DbEntry { id,
-                                      data: data,
+                                      data,
                                       file_name,
                                       mime_type,
                                       best_before, }.into(),
